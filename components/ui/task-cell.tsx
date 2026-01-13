@@ -25,6 +25,7 @@ interface TaskCellProps {
   onEditChange?: (value: string) => void;
   onEditSubmit?: () => void;
   onEditCancel?: () => void;
+  onEnterPress?: (id: string) => void; // when Enter is pressed while not editing
   canEdit?: boolean;
   // initial caret position when entering edit mode
   initialCaretPos?: number | null;
@@ -50,6 +51,7 @@ export function TaskCell({
   onEditChange,
   onEditSubmit,
   onEditCancel,
+  onEnterPress,
   canEdit = true,
   initialCaretPos = null,
   className = "",
@@ -87,7 +89,15 @@ export function TaskCell({
   const handleContainerKeyDown = (e: React.KeyboardEvent) => {
     if (!canEdit) return;
     if (isEditing) return;
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // Se tem onEnterPress, chama ele (para criar novo item); senão, entra em edição
+      if (onEnterPress) {
+        onEnterPress(id);
+      } else {
+        onClick?.(id);
+      }
+    } else if (e.key === " ") {
       e.preventDefault();
       onClick?.(id);
     }
@@ -133,11 +143,19 @@ export function TaskCell({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                onEditSubmit?.();
+                if (isEditing) {
+                  onEditSubmit?.();
+                } else if (onEnterPress) {
+                  onEnterPress(id);
+                } else {
+                  onClick?.(id);
+                }
               }
               if (e.key === "Escape") {
                 e.preventDefault();
-                onEditCancel?.();
+                if (isEditing) {
+                  onEditCancel?.();
+                }
               }
             }}
             onBlur={() => onEditSubmit?.()}
