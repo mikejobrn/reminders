@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { IoChevronBack, IoAdd, IoEllipsisHorizontal } from "react-icons/io5";
 import { TaskCell } from "@/components/ui/task-cell";
@@ -10,7 +10,7 @@ interface Reminder {
   id: string;
   title: string;
   notes?: string;
-  isCompleted: boolean;
+  completed: boolean;
   priority: number;
   flagged: boolean;
   utcDatetime?: string;
@@ -41,8 +41,11 @@ interface List {
 export default function ListDetailPage({
   params,
 }: {
-  params: { listId: string };
+  params: Promise<{ listId: string }>;
 }) {
+  // Resolver params (Next.js 16)
+  const { listId } = React.use(params);
+  
   const [list, setList] = useState<List | null>(null);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,21 +57,22 @@ export default function ListDetailPage({
   // Carregar lista e lembretes
   useEffect(() => {
     fetchListAndReminders();
-  }, [params.listId]);
+  }, [listId]);
 
   const fetchListAndReminders = async () => {
+    
     try {
       setLoading(true);
       
       // Carregar lista
-      const listResponse = await fetch(`/api/lists/${params.listId}`);
+      const listResponse = await fetch(`/api/lists/${listId}`);
       if (!listResponse.ok) throw new Error("Erro ao carregar lista");
       const listData = await listResponse.json();
       setList(listData);
       
       // Carregar lembretes
       const remindersResponse = await fetch(
-        `/api/lists/${params.listId}/reminders?parentId=null`
+        `/api/lists/${listId}/reminders?parentId=null`
       );
       if (!remindersResponse.ok) throw new Error("Erro ao carregar lembretes");
       const remindersData = await remindersResponse.json();
@@ -87,14 +91,14 @@ export default function ListDetailPage({
     if (!newReminderTitle.trim()) return;
     
     try {
-      const response = await fetch(`/api/lists/${params.listId}/reminders`, {
+      const response = await fetch(`/api/lists/${listId}/reminders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           title: newReminderTitle,
-          listId: params.listId,
+          listId: listId,
         }),
       });
       
@@ -120,7 +124,7 @@ export default function ListDetailPage({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          isCompleted: completed,
+          completed: completed,
         }),
       });
       

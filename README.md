@@ -1,26 +1,38 @@
 # Lembretes - PWA estilo iPhone
 
-Aplicativo de lembretes com interface idêntica ao iPhone Reminders, desenvolvido com Next.js 15, React 18+, e PostgreSQL.
+Aplicativo de lembretes com interface idêntica ao iPhone Reminders, desenvolvido com Next.js 16, React 18+, e PostgreSQL.
 
 ## 🚀 Tecnologias
 
-- **Frontend:** Next.js 15 (App Router), React 18+, TypeScript, Tailwind CSS
-- **Backend:** NextAuth.js, Prisma ORM, PostgreSQL (Neon)
-- **Real-time:** Socket.io
-- **PWA:** next-pwa, Service Workers, IndexedDB (Dexie)
-- **Notificações:** OneSignal
-- **Storage:** Vercel Blob
+- **Frontend:** Next.js 16.1.1 (App Router), React 18+, TypeScript, Tailwind CSS v4
+- **Backend:** NextAuth.js v5, Prisma ORM v7.2.0, PostgreSQL (Neon)
+- **Database:** Neon PostgreSQL com @prisma/adapter-neon
+- **Real-time:** Socket.io (planejado)
+- **PWA:** next-pwa, Service Workers, IndexedDB (Dexie - planejado)
+- **Notificações:** OneSignal (planejado)
+- **Storage:** Vercel Blob (planejado)
 - **Design:** Sistema de cores iOS, Fonte Inter, Ionicons 5
 - **Timezone:** Luxon
 - **Recorrência:** rrule.js
+
+## ✨ Features Implementadas
+
+- ✅ Autenticação completa (login/registro)
+- ✅ Sistema de listas com cores e ícones
+- ✅ Lembretes com prioridade, tags, notas
+- ✅ Suporte a subtarefas infinitas
+- ✅ Dark mode completo
+- ✅ Design 100% fiel ao iPhone
+- ✅ Proteção de rotas com Proxy (Next.js 16)
+- ✅ API RESTful completa
+- ✅ Sistema de permissões (compartilhamento de listas)
 
 ## 📋 Pré-requisitos
 
 - Node.js 18+ 
 - npm ou yarn
 - Conta no Neon (PostgreSQL gratuito)
-- Conta na Vercel (hospedagem gratuita)
-- Conta no OneSignal (notificações gratuitas)
+- Conta na Vercel (hospedagem gratuita) - opcional
 
 ## 🔧 Setup Local
 
@@ -41,7 +53,7 @@ npm install
 
 1. Acesse [neon.tech](https://neon.tech) e crie uma conta gratuita
 2. Crie um novo projeto
-3. Copie a connection string
+3. Copie a connection string (Pooled connection)
 4. Crie o arquivo `.env`:
 
 ```bash
@@ -57,9 +69,19 @@ DATABASE_URL="postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?s
 ### 4. Execute as migrations do Prisma
 
 ```bash
+# Rodar migrations
 npx prisma migrate dev --name init
+
+# Gerar Prisma Client
 npx prisma generate
+
+# Criar dados de teste (opcional)
+npx prisma db seed
 ```
+
+**Credenciais de teste criadas pelo seed:**
+- Email: `teste@lembretes.app`
+- Senha: `123456`
 
 ### 5. Configure o NextAuth.js
 
@@ -76,25 +98,36 @@ NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="seu-secret-gerado-aqui"
 ```
 
-### 6. Configure o OneSignal (Notificações)
-
-1. Acesse [onesignal.com](https://onesignal.com) e crie uma conta gratuita
-2. Crie um novo app (tipo: Web Push)
-3. Copie o App ID e REST API Key
-4. Adicione ao `.env`:
-
-```env
-ONESIGNAL_APP_ID="seu-app-id"
-ONESIGNAL_REST_API_KEY="sua-api-key"
-```
-
-### 7. Inicie o servidor de desenvolvimento
+### 6. Inicie o servidor de desenvolvimento
 
 ```bash
 npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000)
+
+## 🎯 Funcionalidades Principais
+
+### Autenticação
+- Login com email e senha
+- Registro de novos usuários
+- Sessão persistente
+- Proteção automática de rotas
+
+### Listas
+- Criar, editar, excluir listas
+- Cores e ícones personalizados
+- Contador de tarefas incompletas
+- Sistema de permissões (compartilhamento)
+
+### Lembretes
+- Criar, editar, excluir lembretes
+- Prioridades (baixa, média, alta)
+- Tags coloridas
+- Notas e anexos
+- Data e hora com timezone
+- Recorrência
+- Subtarefas infinitas
 
 ## 🌐 Deploy na Vercel
 

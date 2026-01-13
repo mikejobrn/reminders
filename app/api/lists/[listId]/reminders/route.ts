@@ -91,7 +91,7 @@ function convertToUTC(dateStr: string, timezone: string, isFloating: boolean, is
 // GET /api/lists/[listId]/reminders - Buscar lembretes de uma lista
 export async function GET(
   request: NextRequest,
-  { params }: { params: { listId: string } }
+  { params }: { params: Promise<{ listId: string }> }
 ) {
   try {
     const session = await auth();
@@ -99,7 +99,7 @@ export async function GET(
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { listId } = params;
+    const { listId } = await params;
     const access = await checkListAccess(listId, session.user.email);
 
     if (!access.authorized) {
@@ -171,7 +171,7 @@ export async function GET(
 // POST /api/lists/[listId]/reminders - Criar novo lembrete
 export async function POST(
   request: NextRequest,
-  { params }: { params: { listId: string } }
+  { params }: { params: Promise<{ listId: string }> }
 ) {
   try {
     const session = await auth();
@@ -179,7 +179,7 @@ export async function POST(
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { listId } = params;
+    const { listId } = await params;
     const access = await checkListAccess(listId, session.user.email);
 
     if (!access.authorized || access.role === "viewer") {

@@ -4,10 +4,10 @@ Este guia detalha o processo completo de deploy do aplicativo na Vercel com banc
 
 ## 📋 Checklist Pré-Deploy
 
-- [ ] Código commitado no GitHub
-- [ ] Conta criada no Neon (neon.tech)
-- [ ] Conta criada na Vercel (vercel.com)
-- [ ] Conta criada no OneSignal (onesignal.com)
+- [x] Código commitado no GitHub
+- [x] Conta criada no Neon (neon.tech)
+- [x] Conta criada na Vercel (vercel.com)
+- [x] Conta criada no OneSignal (onesignal.com)
 - [ ] Todas as variáveis de ambiente documentadas
 
 ## 1️⃣ Configurar Banco de Dados (Neon - Gratuito)
@@ -36,11 +36,14 @@ Este guia detalha o processo completo de deploy do aplicativo na Vercel com banc
 ### Rodar Migrations (Local primeiro)
 
 ```bash
-# Criar arquivo .env local
+# Criar arquivo .env local (se não existir)
 cp .env.example .env
 
 # Editar .env e adicionar DATABASE_URL
 # DATABASE_URL="postgresql://..."
+
+# IMPORTANTE: No Prisma 7, o arquivo prisma.config.ts deve estar na RAIZ do projeto
+# Verifique se o arquivo prisma.config.ts existe na raiz (não dentro de /prisma)
 
 # Rodar migrations
 npx prisma migrate dev --name init
@@ -48,6 +51,8 @@ npx prisma migrate dev --name init
 # Gerar Prisma Client
 npx prisma generate
 ```
+
+**Nota sobre Prisma 7:** A partir do Prisma 7, a configuração de conexão com o banco de dados foi movida do `schema.prisma` para o arquivo `prisma.config.ts` na raiz do projeto. O datasource no schema.prisma agora contém apenas o provider, sem a propriedade `url`.
 
 ## 2️⃣ Configurar Notificações (OneSignal - Gratuito)
 

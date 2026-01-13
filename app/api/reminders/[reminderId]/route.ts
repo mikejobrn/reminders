@@ -102,7 +102,7 @@ function convertToUTC(
 // GET /api/reminders/[reminderId] - Buscar lembrete específico
 export async function GET(
   request: NextRequest,
-  { params }: { params: { reminderId: string } }
+  { params }: { params: Promise<{ reminderId: string }> }
 ) {
   try {
     const session = await auth();
@@ -110,7 +110,7 @@ export async function GET(
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { reminderId } = params;
+    const { reminderId } = await params;
     const access = await checkReminderAccess(reminderId, session.user.email);
 
     if (!access.authorized) {
@@ -184,7 +184,7 @@ export async function GET(
 // PATCH /api/reminders/[reminderId] - Atualizar lembrete
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { reminderId: string } }
+  { params }: { params: Promise<{ reminderId: string }> }
 ) {
   try {
     const session = await auth();
@@ -192,7 +192,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { reminderId } = params;
+    const { reminderId } = await params;
     const access = await checkReminderAccess(reminderId, session.user.email);
 
     if (!access.authorized || access.role === "viewer") {
@@ -339,7 +339,7 @@ export async function PATCH(
 // DELETE /api/reminders/[reminderId] - Deletar lembrete
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { reminderId: string } }
+  { params }: { params: Promise<{ reminderId: string }> }
 ) {
   try {
     const session = await auth();
@@ -347,7 +347,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const { reminderId } = params;
+    const { reminderId } = await params;
     const access = await checkReminderAccess(reminderId, session.user.email);
 
     if (!access.authorized || access.role === "viewer") {

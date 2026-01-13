@@ -10,7 +10,7 @@ const createListSchema = z.object({
   icon: z.string().optional(),
   isSmart: z.boolean().default(false),
   smartCriteria: z.any().optional(),
-  sortOrder: z.number().optional(),
+  order: z.number().optional(),
 });
 
 // Schema de validação para atualização de lista
@@ -20,8 +20,7 @@ const updateListSchema = z.object({
   icon: z.string().optional(),
   isSmart: z.boolean().optional(),
   smartCriteria: z.any().optional(),
-  sortOrder: z.number().optional(),
-  isArchived: z.boolean().optional(),
+  order: z.number().optional(),
 });
 
 // GET /api/lists - Buscar todas as listas do usuário
@@ -52,15 +51,13 @@ export async function GET(request: NextRequest) {
     const ownLists = await prisma.list.findMany({
       where: {
         userId: user.id,
-        isArchived: false,
       },
       include: {
         _count: {
           select: {
             reminders: {
               where: {
-                isCompleted: false,
-                deletedAt: null,
+                completed: false,
               },
             },
           },
@@ -79,7 +76,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        sortOrder: "asc",
+        order: "asc",
       },
     });
 
@@ -95,13 +92,12 @@ export async function GET(request: NextRequest) {
               select: {
                 reminders: {
                   where: {
-                    isCompleted: false,
-                    deletedAt: null,
+                    completed: false,
                   },
                 },
               },
             },
-            owner: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -179,21 +175,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createListSchema.parse(body);
 
-    // Se sortOrder não for fornecido, calcular o próximo
-    let sortOrder = validatedData.sortOrder;
-    if (sortOrder === undefined) {
+    // Se order não for fornecido, calcular o próximo
+    let order = validatedData.order;
+    if (order === undefined) {
       const lastList = await prisma.list.findFirst({
         where: { userId: user.id },
-        orderBy: { sortOrder: "desc" },
+        orderBy: { order: "desc" },
       });
-      sortOrder = (lastList?.sortOrder ?? 0) + 1;
+      order = (lastList?.order ?? 0) + 1;
     }
 
     // Criar a lista
     const newList = await prisma.list.create({
       data: {
         ...validatedData,
-        sortOrder,
+        order,
         userId: user.id,
       },
       include: {
@@ -201,7 +197,7 @@ export async function POST(request: NextRequest) {
           select: {
             reminders: {
               where: {
-                isCompleted: false,
+                completed: false,
                 deletedAt: null,
               },
             },

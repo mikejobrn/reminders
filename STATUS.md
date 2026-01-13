@@ -3,12 +3,15 @@
 ## ✅ Concluído
 
 ### 1. Configuração Base
-- ✅ Next.js 15 com TypeScript e App Router
+- ✅ Next.js 16.1.1 com TypeScript e App Router
 - ✅ Tailwind CSS v4 com sistema de design iOS
 - ✅ Fonte Inter auto-hospedada
 - ✅ PWA configurado com next-pwa (webpack mode)
 - ✅ Dark mode com next-themes
-- ✅ Prisma ORM com schema completo
+- ✅ Prisma ORM v7.2.0 com schema completo
+- ✅ Banco de dados Neon PostgreSQL conectado
+- ✅ Migrations executadas com sucesso
+- ✅ Prisma Client configurado com @prisma/adapter-neon
 
 ### 2. Backend & API
 - ✅ NextAuth.js v5 com Credentials provider
@@ -17,13 +20,22 @@
   - `GET/PATCH/DELETE /api/lists/[listId]` - Operações em lista específica
   - `GET/POST /api/lists/[listId]/reminders` - Lembretes de uma lista
   - `GET/PATCH/DELETE /api/reminders/[reminderId]` - Operações em lembrete
+  - `POST /api/auth/register` - Registro de usuários
 - ✅ Sistema de permissões (owner/admin/editor/viewer)
-- ✅ Soft delete em listas e lembretes
+- ✅ Soft delete em listas (deletedAt)
 - ✅ Suporte a timezone com Luxon
 - ✅ Suporte a recorrência com rrule
 - ✅ Suporte a subtarefas infinitas (hierarquia com parentId)
 
-### 3. Componentes UI
+### 3. Autenticação & Proteção
+- ✅ Proxy (Next.js 16) - substituindo middleware
+- ✅ Página de login (`/login`)
+- ✅ Página de registro (`/register`)
+- ✅ Proteção automática de rotas
+- ✅ Redirecionamento para callback URL
+- ✅ Criação automática de listas padrão no registro
+
+### 4. Componentes UI
 - ✅ CheckboxIOS - Checkbox estilo iOS com animação e haptic feedback
 - ✅ DateBadge - Badge contextual de data (Hoje/Amanhã/Atrasado)
 - ✅ PriorityBadge - Indicador de prioridade (! !! !!!)
@@ -31,34 +43,30 @@
 - ✅ ListHeader - Cabeçalho de lista com ícone e contador
 - ✅ ThemeProvider - Provider de tema com dark mode
 
-### 4. Páginas
+### 5. Páginas
 - ✅ `/` - Redireciona para `/lists`
+- ✅ `/login` - Autenticação com NextAuth
+- ✅ `/register` - Cadastro de novos usuários
 - ✅ `/lists` - Página de overview de todas as listas
 - ✅ `/lists/[listId]` - Página de detalhes da lista com lembretes
 
-### 5. Sistema de Design
+### 6. Sistema de Design
 - ✅ Cores iOS (blue, red, orange, yellow, green, teal, purple, pink)
 - ✅ Tipografia iOS (Large Title 34px até Caption 11px)
 - ✅ Espaçamento e border radius iOS
 - ✅ Suporte completo a dark mode
 
+### 7. Dados de Teste
+- ✅ Script de seed configurado
+- ✅ Usuário teste: `teste@lembretes.app` / `123456`
+- ✅ 3 listas padrão criadas automaticamente
+- ✅ 3 lembretes de exemplo
+
 ## 🚧 Próximos Passos
 
 ### Prioridade Alta
 
-1. **Configurar Banco de Dados**
-   - Criar database no Neon (PostgreSQL free tier)
-   - Adicionar `DATABASE_URL` no `.env`
-   - Executar `npx prisma migrate dev --name init`
-   - Criar usuário de teste
-
-2. **Implementar Autenticação**
-   - Página de login (`/login`)
-   - Página de registro (`/register`)
-   - Proteção de rotas com NextAuth
-   - OAuth com Google e Apple (opcional para MVP)
-
-3. **Modal de Detalhes do Lembrete**
+1. **Modal de Detalhes do Lembrete**
    - Editar título e notas
    - Definir data e hora
    - Selecionar prioridade
@@ -67,7 +75,7 @@
    - Adicionar subtarefas
    - Upload de anexos (Vercel Blob)
 
-4. **OneSignal para Notificações**
+2. **OneSignal para Notificações**
    - Criar conta no OneSignal
    - Integrar SDK no frontend
    - Implementar agendamento de notificações
@@ -75,24 +83,24 @@
 
 ### Prioridade Média
 
-5. **Listas Inteligentes**
+3. **Listas Inteligentes**
    - Hoje - lembretes com data hoje
    - Agendados - todos com data futura
    - Todos - todos os lembretes
    - Sinalizados - marcados com flag
    - Concluídos - histórico de completados
 
-6. **Sistema de Tags**
+4. **Sistema de Tags**
    - API routes para tags CRUD
    - Componente de seleção de tags
    - Filtrar por tags
 
-7. **Drag and Drop**
+5. **Drag and Drop**
    - Reordenar tarefas (@dnd-kit)
    - Mover entre listas
    - Transformar em subtarefa
 
-8. **Offline-First**
+6. **Offline-First**
    - Dexie.js para cache local
    - Sincronização automática
    - Indicador de status de sincronização

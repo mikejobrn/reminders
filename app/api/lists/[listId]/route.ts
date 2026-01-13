@@ -72,7 +72,7 @@ async function checkListPermission(
 // GET /api/lists/[listId] - Buscar lista específica
 export async function GET(
   request: NextRequest,
-  { params }: { params: { listId: string } }
+  { params }: { params: Promise<{ listId: string }> }
 ) {
   try {
     const session = await auth();
@@ -84,7 +84,7 @@ export async function GET(
       );
     }
 
-    const { listId } = params;
+    const { listId } = await params;
     const permission = await checkListPermission(
       listId,
       session.user.email,
@@ -160,7 +160,7 @@ export async function GET(
 // PATCH /api/lists/[listId] - Atualizar lista
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { listId: string } }
+  { params }: { params: Promise<{ listId: string }> }
 ) {
   try {
     const session = await auth();
@@ -172,7 +172,7 @@ export async function PATCH(
       );
     }
 
-    const { listId } = params;
+    const { listId } = await params;
     const permission = await checkListPermission(
       listId,
       session.user.email,
@@ -233,7 +233,7 @@ export async function PATCH(
 // DELETE /api/lists/[listId] - Deletar lista (soft delete)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { listId: string } }
+  { params }: { params: Promise<{ listId: string }> }
 ) {
   try {
     const session = await auth();
@@ -245,7 +245,7 @@ export async function DELETE(
       );
     }
 
-    const { listId } = params;
+    const { listId } = await params;
     const permission = await checkListPermission(
       listId,
       session.user.email,
