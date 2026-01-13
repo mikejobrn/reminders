@@ -1,0 +1,50 @@
+{
+  "name": "lembretes",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^25.0.6",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.23",
+    "bcryptjs": "^3.0.3",
+    "dexie": "^4.2.1",
+    "dnd-kit": "^0.0.2",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.1",
+    "luxon": "^3.7.2",
+    "next": "^16.1.1",
+    "next-auth": "^5.0.0-beta.30",
+    "next-pwa": "^5.6.0",
+    "next-themes": "^0.4.6",
+    "postcss": "^8.5.6",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-icons": "^5.5.0",
+    "rrule": "^2.8.1",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.2.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/luxon": "^3.7.1",
+    "prisma": "^7.2.0"
+  }
+}
