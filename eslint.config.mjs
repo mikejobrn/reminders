@@ -1,5 +1,19 @@
 import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 
-const config = [...nextCoreWebVitals];
+const config = [
+    {
+        ignores: [
+            "node_modules/**",
+            ".next/**",
+            "out/**",
+            "build/**",
+            "dist/**",
+            "public/**",
+            ".vscode/**",
+            ".idea/**",
+        ],
+    },
+    ...nextCoreWebVitals,
+];
 
 export default config;

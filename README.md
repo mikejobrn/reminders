@@ -49,6 +49,8 @@ cd lembretes
 npm install
 ```
 
+### 3. Configure as variáveis de ambiente
+
 ### 3. Configure o banco de dados (Neon)
 
 1. Acesse [neon.tech](https://neon.tech) e crie uma conta gratuita
@@ -105,6 +107,43 @@ npm run dev
 ```
 
 Abra [http://localhost:3000](http://localhost:3000)
+
+## 🔍 Validação e Qualidade de Código
+
+O projeto está configurado para validar automaticamente o código durante o desenvolvimento e build:
+
+### Scripts disponíveis
+
+```bash
+# Desenvolvimento
+npm run dev              # Inicia servidor de desenvolvimento
+
+# Validação
+npm run type-check       # Verifica erros de TypeScript
+npm run lint             # Verifica erros de ESLint
+npm run validate         # Executa type-check + lint (recomendado antes de commit)
+
+# Build e Deploy
+npm run build            # Gera build de produção (valida TypeScript automaticamente)
+npm start                # Inicia servidor de produção
+```
+
+### Validação automática no editor
+
+O projeto inclui configurações do VS Code (`.vscode/settings.json`) para:
+- Formatar código ao salvar
+- Corrigir problemas de ESLint automaticamente
+- Validar TypeScript em tempo real
+
+### Antes de fazer commit
+
+Sempre execute antes de enviar código:
+
+```bash
+npm run validate
+```
+
+Isso garante que erros de tipo e lint sejam capturados localmente, evitando falhas no build da Vercel.
 
 ## 🎯 Funcionalidades Principais
 

@@ -4,6 +4,11 @@ import withPWA from "next-pwa";
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Ativar type-checking durante o build
+  typescript: {
+    // Falhar o build se houver erros de TypeScript
+    ignoreBuildErrors: false,
+  },
   webpack: (config) => {
     return config;
   },
