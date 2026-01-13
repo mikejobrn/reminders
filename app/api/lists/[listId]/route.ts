@@ -8,10 +8,7 @@ const updateListSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
-  isSmart: z.boolean().optional(),
-  smartCriteria: z.any().optional(),
-  sortOrder: z.number().optional(),
-  isArchived: z.boolean().optional(),
+  order: z.number().optional(),
 });
 
 // Helper para verificar permissão do usuário na lista
@@ -41,7 +38,7 @@ async function checkListPermission(
   });
 
   if (!list) {
-    return { authorized: false, user, isOwner: false };
+    return { authorized: false, user, isOwner: false, notFound: true as const };
   }
 
   // Se é o dono, tem todas as permissões
@@ -56,9 +53,19 @@ async function checkListPermission(
   }
 
   // Verificar se tem a permissão necessária
-  const roleHierarchy: Record<string, number> = { viewer: 1, editor: 2, admin: 3 };
+  const requiredRoleRank: Record<"viewer" | "editor" | "admin", number> = {
+    viewer: 1,
+    editor: 2,
+    admin: 3,
+  };
+  const shareRoleRank: Record<string, number> = {
+    VIEWER: 1,
+    EDITOR: 2,
+    ADMIN: 3,
+  };
   const hasPermission =
-    roleHierarchy[share.role] >= roleHierarchy[requiredRole];
+    (shareRoleRank[String(share.role).toUpperCase()] ?? 0) >=
+    requiredRoleRank[requiredRole];
 
   return {
     authorized: hasPermission,
@@ -91,6 +98,13 @@ export async function GET(
       "viewer"
     );
 
+    if ((permission as any).notFound) {
+      return NextResponse.json(
+        { error: "Lista não encontrada" },
+        { status: 404 }
+      );
+    }
+
     if (!permission.authorized) {
       return NextResponse.json(
         { error: "Sem permissão para acessar esta lista" },
@@ -106,7 +120,7 @@ export async function GET(
           select: {
             reminders: {
               where: {
-                isCompleted: false,
+                completed: false,
                 deletedAt: null,
               },
             },
@@ -124,7 +138,7 @@ export async function GET(
             },
           },
         },
-        owner: {
+        user: {
           select: {
             id: true,
             name: true,
@@ -142,10 +156,22 @@ export async function GET(
       );
     }
 
+    const toClientRole = (role?: string): "viewer" | "editor" | "admin" => {
+      switch (role) {
+        case "VIEWER":
+          return "viewer";
+        case "EDITOR":
+          return "editor";
+        case "ADMIN":
+        default:
+          return "admin";
+      }
+    };
+
     return NextResponse.json({
       ...list,
       isOwner: permission.isOwner,
-      role: permission.isOwner ? "admin" : permission.role,
+      role: permission.isOwner ? "admin" : toClientRole(permission.role),
       incompleteCount: list._count.reminders,
     });
   } catch (error) {
@@ -194,25 +220,21 @@ export async function PATCH(
       where: { id: listId },
       data: {
         ...validatedData,
-        updatedAt: new Date(),
       },
-      include: {
-        _count: {
-          select: {
-            reminders: {
-              where: {
-                isCompleted: false,
-                deletedAt: null,
-              },
-            },
-          },
-        },
+    });
+
+    // Buscar contagem de lembretes incompletos
+    const incompleteCount = await prisma.reminder.count({
+      where: {
+        listId: listId,
+        completed: false,
+        deletedAt: null,
       },
     });
 
     return NextResponse.json({
       ...updatedList,
-      incompleteCount: updatedList._count.reminders,
+      incompleteCount,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -259,12 +281,9 @@ export async function DELETE(
       );
     }
 
-    // Soft delete - marcar como deletada
-    await prisma.list.update({
+    // Deletar lista (cascade deletará lembretes relacionados)
+    await prisma.list.delete({
       where: { id: listId },
-      data: {
-        deletedAt: new Date(),
-      },
     });
 
     return NextResponse.json(

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,22 +6,20 @@ datasource db {
   provider = "postgresql"
 }
 
-// NextAuth.js Models
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -41,23 +36,22 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime? @map("email_verified")
-  password      String? // Hash bcrypt
-  image         String?
-  timezone      String    @default("America/Fortaleza") // IANA timezone
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  accounts           Account[]
-  sessions           Session[]
-  lists              List[]
-  sharedLists        ListShare[]
-  tags               Tag[]
-  assignedReminders  Reminder[]  @relation("AssignedTo")
-  oneSignalPlayerId  String?     @unique @map("onesignal_player_id")
+  id                String      @id @default(cuid())
+  name              String?
+  email             String      @unique
+  emailVerified     DateTime?   @map("email_verified")
+  password          String?
+  image             String?
+  timezone          String      @default("America/Fortaleza")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  oneSignalPlayerId String?     @unique @map("onesignal_player_id")
+  accounts          Account[]
+  sharedLists       ListShare[]
+  lists             List[]
+  assignedReminders Reminder[]  @relation("AssignedTo")
+  sessions          Session[]
+  tags              Tag[]
 
   @@map("users")
 }
@@ -71,116 +65,89 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// Application Models
 model List {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
-  color     String   @default("blue") // listColors ID
-  icon      String   @default("list.bullet") // Ionicons name
-  order     Int      @default(0)
-  viewMode  ViewMode @default(LIST)
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sections  Section[]
-  reminders Reminder[]
+  color     String      @default("blue")
+  icon      String      @default("list.bullet")
+  order     Int         @default(0)
+  viewMode  ViewMode    @default(LIST)
+  userId    String      @map("user_id")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
   shares    ListShare[]
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders Reminder[]
+  sections  Section[]
 
   @@index([userId])
   @@index([order])
   @@map("lists")
 }
 
-enum ViewMode {
-  LIST
-  KANBAN
-}
-
 model ListShare {
-  id             String    @id @default(cuid())
-  listId         String    @map("list_id")
-  sharedWithId   String    @map("shared_with_id")
-  role           ShareRole @default(VIEWER)
-  invitedAt      DateTime  @default(now()) @map("invited_at")
-  acceptedAt     DateTime? @map("accepted_at")
-
-  list         List @relation(fields: [listId], references: [id], onDelete: Cascade)
-  sharedWith   User @relation(fields: [sharedWithId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  listId       String    @map("list_id")
+  sharedWithId String    @map("shared_with_id")
+  role         ShareRole @default(VIEWER)
+  invitedAt    DateTime  @default(now()) @map("invited_at")
+  acceptedAt   DateTime? @map("accepted_at")
+  list         List      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  sharedWith   User      @relation(fields: [sharedWithId], references: [id], onDelete: Cascade)
 
   @@unique([listId, sharedWithId])
   @@index([sharedWithId])
   @@map("list_shares")
 }
 
-enum ShareRole {
-  VIEWER
-  EDITOR
-  ADMIN
-}
-
 model Section {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  order     Int      @default(0)
-  listId    String   @map("list_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  list      List       @relation(fields: [listId], references: [id], onDelete: Cascade)
+  order     Int        @default(0)
+  listId    String     @map("list_id")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
   reminders Reminder[]
+  list      List       @relation(fields: [listId], references: [id], onDelete: Cascade)
 
   @@index([listId, order])
   @@map("sections")
 }
 
 model Reminder {
-  id                    String    @id @default(cuid())
-  title                 String
-  notes                 String?   @db.Text
-  completed             Boolean   @default(false)
-  completedAt           DateTime? @map("completed_at")
-  
-  // Priority
-  priority              Priority  @default(NONE)
-  
-  // Dates and Times (Timezone support)
-  utcDatetime           DateTime? @map("utc_datetime") @db.Timestamptz
-  timezone              String?   // IANA timezone (e.g., "America/Fortaleza")
-  isFloating            Boolean   @default(false) @map("is_floating") // Floating time behavior
-  isDateOnly            Boolean   @default(false) @map("is_date_only") // Date-only reminder
-  reminderDate          DateTime? @map("reminder_date") @db.Date // For date-only reminders
-  dueTime               String?   @map("due_time") // HH:mm format
-  startDate             DateTime? @map("start_date") @db.Date
-  
-  // Hierarchy
-  order                 Int       @default(0)
-  parentId              String?   @map("parent_id") // For infinite nesting
-  
-  // Relations
-  listId                String    @map("list_id")
-  sectionId             String?   @map("section_id")
-  assignedToId          String?   @map("assigned_to_id")
-  
-  // OneSignal integration
-  oneSignalNotificationId String?  @unique @map("onesignal_notification_id")
-  
-  // Metadata
-  createdAt             DateTime  @default(now()) @map("created_at")
-  createdTimezone       String    @default("America/Fortaleza") @map("created_timezone")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  list         List                @relation(fields: [listId], references: [id], onDelete: Cascade)
-  section      Section?            @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  parent       Reminder?           @relation("ReminderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children     Reminder[]          @relation("ReminderHierarchy")
-  assignedTo   User?               @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  tags         ReminderTag[]
-  recurrence   RecurrenceRule?
-  attachments  Attachment[]
-  completionHistory CompletionHistory[]
+  id                      String              @id @default(cuid())
+  title                   String
+  notes                   String?
+  completed               Boolean             @default(false)
+  completedAt             DateTime?           @map("completed_at")
+  priority                Priority            @default(NONE)
+  utcDatetime             DateTime?           @map("utc_datetime") @db.Timestamptz(6)
+  timezone                String?
+  isFloating              Boolean             @default(false) @map("is_floating")
+  isDateOnly              Boolean             @default(false) @map("is_date_only")
+  reminderDate            DateTime?           @map("reminder_date") @db.Date
+  dueTime                 String?             @map("due_time")
+  startDate               DateTime?           @map("start_date") @db.Date
+  order                   Int                 @default(0)
+  sortOrder               Int                 @default(0) @map("sort_order")
+  parentId                String?             @map("parent_id")
+  listId                  String              @map("list_id")
+  sectionId               String?             @map("section_id")
+  assignedToId            String?             @map("assigned_to_id")
+  oneSignalNotificationId String?             @unique @map("onesignal_notification_id")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  createdTimezone         String              @default("America/Fortaleza") @map("created_timezone")
+  updatedAt               DateTime            @updatedAt @map("updated_at")
+  deletedAt               DateTime?           @map("deleted_at")
+  attachments             Attachment[]
+  completionHistory       CompletionHistory[]
+  recurrence              RecurrenceRule?
+  tags                    ReminderTag[]
+  assignedTo              User?               @relation("AssignedTo", fields: [assignedToId], references: [id])
+  list                    List                @relation(fields: [listId], references: [id], onDelete: Cascade)
+  parent                  Reminder?           @relation("ReminderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children                Reminder[]          @relation("ReminderHierarchy")
+  section                 Section?            @relation(fields: [sectionId], references: [id])
 
   @@index([listId, completed, order])
   @@index([sectionId])
@@ -190,22 +157,14 @@ model Reminder {
   @@map("reminders")
 }
 
-enum Priority {
-  NONE
-  LOW
-  MEDIUM
-  HIGH
-}
-
 model Tag {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   name      String
-  color     String   @default("blue")
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  color     String        @default("blue")
+  userId    String        @map("user_id")
+  createdAt DateTime      @default(now()) @map("created_at")
   reminders ReminderTag[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
   @@index([userId])
@@ -216,34 +175,31 @@ model ReminderTag {
   reminderId String   @map("reminder_id")
   tagId      String   @map("tag_id")
   createdAt  DateTime @default(now()) @map("created_at")
-
-  reminder Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
-  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  reminder   Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([reminderId, tagId])
   @@map("reminder_tags")
 }
 
 model RecurrenceRule {
-  id               String    @id @default(cuid())
-  reminderId       String    @unique @map("reminder_id")
-  rruleString      String    @map("rrule_string") @db.Text // RFC 5545 format
+  id                String    @id @default(cuid())
+  reminderId        String    @unique @map("reminder_id")
+  rruleString       String    @map("rrule_string")
   lastGeneratedDate DateTime? @map("last_generated_date") @db.Date
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-
-  reminder Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  reminder          Reminder  @relation(fields: [reminderId], references: [id], onDelete: Cascade)
 
   @@map("recurrence_rules")
 }
 
 model CompletionHistory {
-  id              String   @id @default(cuid())
-  reminderId      String   @map("reminder_id")
-  completedAt     DateTime @default(now()) @map("completed_at")
-  occurrenceDate  DateTime @map("occurrence_date") @db.Date
-  
-  reminder Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  reminderId     String   @map("reminder_id")
+  completedAt    DateTime @default(now()) @map("completed_at")
+  occurrenceDate DateTime @map("occurrence_date") @db.Date
+  reminder       Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
 
   @@index([reminderId])
   @@index([occurrenceDate])
@@ -251,16 +207,33 @@ model CompletionHistory {
 }
 
 model Attachment {
-  id             String   @id @default(cuid())
-  reminderId     String   @map("reminder_id")
-  vercelBlobUrl  String   @map("vercel_blob_url") @db.Text
-  filename       String
-  mimeType       String   @map("mime_type")
-  size           Int      // bytes
-  createdAt      DateTime @default(now()) @map("created_at")
-
-  reminder Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  reminderId    String   @map("reminder_id")
+  vercelBlobUrl String   @map("vercel_blob_url")
+  filename      String
+  mimeType      String   @map("mime_type")
+  size          Int
+  createdAt     DateTime @default(now()) @map("created_at")
+  reminder      Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
 
   @@index([reminderId])
   @@map("attachments")
+}
+
+enum ViewMode {
+  LIST
+  KANBAN
+}
+
+enum ShareRole {
+  VIEWER
+  EDITOR
+  ADMIN
+}
+
+enum Priority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
 }

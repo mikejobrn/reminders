@@ -1,20 +1,23 @@
-"use client";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+export default async function Home() {
+  const session = await auth();
 
-export default function Home() {
-  const router = useRouter();
+  if (!session?.user?.email) {
+    redirect("/login");
+  }
 
-  useEffect(() => {
-    router.push("/lists");
-  }, [router]);
+  // Evita loop/404 quando existe cookie JWT mas o usuário foi removido do banco
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
 
-  return (
-    <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-      <div className="text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1]">
-        Carregando...
-      </div>
-    </div>
-  );
+  if (!user) {
+    redirect("/login");
+  }
+
+  redirect("/lists");
 }

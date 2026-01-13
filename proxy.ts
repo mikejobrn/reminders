@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 // Rotas públicas que não requerem autenticação
-const publicRoutes = ["/login", "/register"];
-
-// Rotas de API públicas
-const publicApiRoutes = ["/api/auth"];
+const publicRoutes = ["/login", "/register", "/api/auth"];
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -24,9 +21,8 @@ export default async function proxy(request: NextRequest) {
 
   // Verificar se é uma rota pública
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
-  const isPublicApiRoute = publicApiRoutes.some((route) => pathname.startsWith(route));
 
-  if (isPublicRoute || isPublicApiRoute) {
+  if (isPublicRoute) {
     return NextResponse.next();
   }
 
@@ -36,8 +32,8 @@ export default async function proxy(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  // Se não estiver autenticado e tentar acessar rota protegida, redirecionar para login
-  if (!token && !pathname.startsWith("/login")) {
+  // Se não estiver autenticado, redirecionar para login
+  if (!token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -53,5 +49,13 @@ export default async function proxy(request: NextRequest) {
 
 // Rotas que o Proxy NÃO deve executar
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

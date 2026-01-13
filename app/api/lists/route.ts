@@ -8,8 +8,6 @@ const createListSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100),
   color: z.string().optional(),
   icon: z.string().optional(),
-  isSmart: z.boolean().default(false),
-  smartCriteria: z.any().optional(),
   order: z.number().optional(),
 });
 
@@ -18,8 +16,6 @@ const updateListSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
-  isSmart: z.boolean().optional(),
-  smartCriteria: z.any().optional(),
   order: z.number().optional(),
 });
 
@@ -42,8 +38,8 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Usuário não encontrado" },
-        { status: 404 }
+        { error: "Não autorizado" },
+        { status: 401 }
       );
     }
 
@@ -58,6 +54,7 @@ export async function GET(request: NextRequest) {
             reminders: {
               where: {
                 completed: false,
+                deletedAt: null,
               },
             },
           },
@@ -93,6 +90,7 @@ export async function GET(request: NextRequest) {
                 reminders: {
                   where: {
                     completed: false,
+                    deletedAt: null,
                   },
                 },
               },
@@ -122,6 +120,18 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const toClientRole = (role: string): "viewer" | "editor" | "admin" => {
+      switch (role) {
+        case "VIEWER":
+          return "viewer";
+        case "EDITOR":
+          return "editor";
+        case "ADMIN":
+        default:
+          return "admin";
+      }
+    };
+
     // Combinar listas próprias e compartilhadas
     const allLists = [
       ...ownLists.map((list: any) => ({
@@ -133,7 +143,7 @@ export async function GET(request: NextRequest) {
       ...sharedLists.map((share: any) => ({
         ...share.list,
         isOwner: false,
-        role: share.role,
+        role: toClientRole(share.role),
         incompleteCount: share.list._count.reminders,
       })),
     ];
@@ -167,13 +177,15 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Usuário não encontrado" },
-        { status: 404 }
+        { error: "Não autorizado" },
+        { status: 401 }
       );
     }
 
     const body = await request.json();
     const validatedData = createListSchema.parse(body);
+
+    const { name, color, icon } = validatedData;
 
     // Se order não for fornecido, calcular o próximo
     let order = validatedData.order;
@@ -188,7 +200,9 @@ export async function POST(request: NextRequest) {
     // Criar a lista
     const newList = await prisma.list.create({
       data: {
-        ...validatedData,
+        name,
+        ...(color ? { color } : {}),
+        ...(icon ? { icon } : {}),
         order,
         userId: user.id,
       },

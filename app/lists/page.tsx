@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { IoAdd, IoListOutline, IoCalendarOutline, IoFlagOutline, IoCheckmarkCircle } from "react-icons/io5";
+import {
+  IoAdd,
+  IoListOutline,
+  IoCalendarOutline,
+  IoFlagOutline,
+  IoCheckmarkCircleOutline,
+} from "react-icons/io5";
 import { ListHeader } from "@/components/ui/list-header";
 
 interface List {
@@ -34,6 +40,11 @@ export default function ListsPage() {
     try {
       setLoading(true);
       const response = await fetch("/api/lists");
+
+      if (response.status === 401 || response.status === 403) {
+        router.replace(`/login?callbackUrl=${encodeURIComponent("/lists")}`);
+        return;
+      }
       
       if (!response.ok) {
         throw new Error("Erro ao carregar listas");
@@ -86,48 +97,33 @@ export default function ListsPage() {
   };
 
   // Listas inteligentes padrão
+  const renderIcon = (icon?: string, color?: string) => {
+    const iconColor = color ?? "#007AFF";
+    switch (icon) {
+      case "calendar-outline":
+        return <IoCalendarOutline size={20} color={iconColor} />;
+      case "flag-outline":
+        return <IoFlagOutline size={20} color={iconColor} />;
+      case "checkmark-circle-outline":
+        return <IoCheckmarkCircleOutline size={20} color={iconColor} />;
+      case "list-outline":
+      default:
+        return <IoListOutline size={20} color={iconColor} />;
+    }
+  };
+
   const smartLists = [
-    {
-      id: "today",
-      name: "Hoje",
-      icon: "calendar-outline",
-      color: "#007AFF",
-      count: 0,
-    },
-    {
-      id: "scheduled",
-      name: "Agendados",
-      icon: "calendar-outline",
-      color: "#FF3B30",
-      count: 0,
-    },
-    {
-      id: "all",
-      name: "Todos",
-      icon: "list-outline",
-      color: "#8E8E93",
-      count: 0,
-    },
-    {
-      id: "flagged",
-      name: "Sinalizados",
-      icon: "flag-outline",
-      color: "#FF9500",
-      count: 0,
-    },
-    {
-      id: "completed",
-      name: "Concluídos",
-      icon: "checkmark-circle-outline",
-      color: "#8E8E93",
-      count: 0,
-    },
+    { id: "today", name: "Hoje", icon: "calendar-outline", color: "#007AFF", count: 0 },
+    { id: "scheduled", name: "Agendados", icon: "calendar-outline", color: "#FF3B30", count: 0 },
+    { id: "all", name: "Todos", icon: "list-outline", color: "#8E8E93", count: 0 },
+    { id: "flagged", name: "Sinalizados", icon: "flag-outline", color: "#FF9500", count: 0 },
+    { id: "completed", name: "Concluídos", icon: "checkmark-circle-outline", color: "#8E8E93", count: 0 },
   ];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <div className="text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1]">
+        <div className="text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
           Carregando...
         </div>
       </div>
@@ -137,12 +133,12 @@ export default function ListsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <div className="text-[--color-ios-red] p-4 text-center">
+        <div className="text-(--color-ios-red) p-4 text-center">
           <p className="font-semibold mb-2">Erro ao carregar listas</p>
           <p className="text-sm">{error}</p>
           <button
             onClick={fetchLists}
-            className="mt-4 px-4 py-2 bg-[--color-ios-blue] dark:bg-[--color-ios-dark-blue] text-white rounded-lg"
+            className="mt-4 px-4 py-2 bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white rounded-lg"
           >
             Tentar novamente
           </button>
@@ -154,7 +150,7 @@ export default function ListsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-black border-b border-[--color-ios-gray-6] dark:border-[--color-ios-dark-gray-6]">
+      <div className="sticky top-0 z-10 bg-white dark:bg-black border-b border-(--color-ios-gray-6) dark:border-(--color-ios-dark-gray-6)">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-[34px] font-bold text-black dark:text-white">
@@ -162,7 +158,7 @@ export default function ListsPage() {
             </h1>
             <button
               onClick={() => setShowNewListDialog(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[--color-ios-blue] dark:bg-[--color-ios-dark-blue] text-white rounded-lg hover:opacity-80 transition-opacity"
+              className="flex items-center gap-2 px-4 py-2 bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white rounded-lg hover:opacity-80 transition-opacity"
             >
               <IoAdd size={20} />
               <span>Nova Lista</span>
@@ -175,7 +171,7 @@ export default function ListsPage() {
       <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Listas Inteligentes */}
         <section className="mb-8">
-          <h2 className="text-[13px] uppercase font-semibold text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1] mb-3 px-2">
+          <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) mb-3 px-2">
             Listas Inteligentes
           </h2>
           <div className="space-y-2">
@@ -183,10 +179,10 @@ export default function ListsPage() {
               <button
                 key={list.id}
                 onClick={() => handleListClick(list.id)}
-                className="w-full bg-[--color-ios-gray-6] dark:bg-[--color-ios-dark-gray-6] hover:bg-[--color-ios-gray-5] dark:hover:bg-[--color-ios-dark-gray-5] rounded-xl p-4 transition-colors"
+                className="w-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5) rounded-xl px-4 py-3 transition-colors"
               >
                 <ListHeader
-                  icon={list.icon}
+                  icon={renderIcon(list.icon, list.color)}
                   title={list.name}
                   count={list.count}
                   color={list.color}
@@ -198,14 +194,14 @@ export default function ListsPage() {
 
         {/* Minhas Listas */}
         <section>
-          <h2 className="text-[13px] uppercase font-semibold text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1] mb-3 px-2">
+          <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) mb-3 px-2">
             Minhas Listas
           </h2>
           {lists.length === 0 ? (
-            <div className="text-center py-12 text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1]">
+            <div className="text-center py-12 text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
               <IoListOutline size={48} className="mx-auto mb-4 opacity-50" />
               <p>Nenhuma lista criada</p>
-              <p className="text-sm mt-2">Clique em "Nova Lista" para começar</p>
+              <p className="text-sm mt-2">Clique em &quot;Nova Lista&quot; para começar</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -213,16 +209,16 @@ export default function ListsPage() {
                 <button
                   key={list.id}
                   onClick={() => handleListClick(list.id)}
-                  className="w-full bg-[--color-ios-gray-6] dark:bg-[--color-ios-dark-gray-6] hover:bg-[--color-ios-gray-5] dark:hover:bg-[--color-ios-dark-gray-5] rounded-xl p-4 transition-colors"
+                  className="w-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5) rounded-xl px-4 py-3 transition-colors"
                 >
                   <ListHeader
-                    icon={list.icon || "list-outline"}
+                    icon={renderIcon(list.icon || "list-outline", list.color)}
                     title={list.name}
                     count={list.incompleteCount}
                     color={list.color || "#007AFF"}
                   />
                   {!list.isOwner && (
-                    <div className="mt-2 text-xs text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-1]">
+                    <div className="mt-1 pl-12 text-xs text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
                       Compartilhada • {list.role === "viewer" ? "Visualizador" : list.role === "editor" ? "Editor" : "Admin"}
                     </div>
                   )}
@@ -236,7 +232,7 @@ export default function ListsPage() {
       {/* Dialog Nova Lista */}
       {showNewListDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-[--color-ios-dark-gray-6] rounded-2xl w-full max-w-md p-6">
+          <div className="bg-white dark:bg-(--color-ios-dark-gray-6) rounded-2xl w-full max-w-md p-6">
             <h2 className="text-xl font-semibold mb-4 text-black dark:text-white">
               Nova Lista
             </h2>
@@ -250,7 +246,7 @@ export default function ListsPage() {
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
                   placeholder="Nome da lista"
-                  className="w-full px-4 py-2 rounded-lg bg-[--color-ios-gray-6] dark:bg-[--color-ios-dark-gray-5] text-black dark:text-white border-none focus:ring-2 focus:ring-[--color-ios-blue]"
+                  className="w-full px-4 py-2 rounded-lg bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-5) text-black dark:text-white border-none focus:ring-2 focus:ring-(--color-ios-blue)"
                   autoFocus
                 />
               </div>
@@ -292,14 +288,14 @@ export default function ListsPage() {
                     setShowNewListDialog(false);
                     setNewListName("");
                   }}
-                  className="flex-1 px-4 py-2 rounded-lg bg-[--color-ios-gray-6] dark:bg-[--color-ios-dark-gray-5] text-black dark:text-white hover:opacity-80 transition-opacity"
+                  className="flex-1 px-4 py-2 rounded-lg bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-5) text-black dark:text-white hover:opacity-80 transition-opacity"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={!newListName.trim()}
-                  className="flex-1 px-4 py-2 rounded-lg bg-[--color-ios-blue] dark:bg-[--color-ios-dark-blue] text-white hover:opacity-80 transition-opacity disabled:opacity-50"
+                  className="flex-1 px-4 py-2 rounded-lg bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white hover:opacity-80 transition-opacity disabled:opacity-50"
                 >
                   Criar
                 </button>

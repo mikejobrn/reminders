@@ -25,7 +25,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
     if (diffDays === 0) {
       return {
         label: showTime ? `Hoje às ${formatTime(dateObj)}` : "Hoje",
-        colorClass: "bg-[--color-ios-blue] dark:bg-[--color-ios-dark-blue]",
+        colorClass: "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue)",
         bgColorVar: "var(--color-ios-blue)",
         textColorVar: "white",
       };
@@ -35,7 +35,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
     if (diffDays === 1) {
       return {
         label: showTime ? `Amanhã às ${formatTime(dateObj)}` : "Amanhã",
-        colorClass: "bg-[--color-ios-orange] dark:bg-[--color-ios-dark-orange]",
+        colorClass: "bg-(--color-ios-orange) dark:bg-(--color-ios-dark-orange)",
         bgColorVar: "var(--color-ios-orange)",
         textColorVar: "white",
       };
@@ -46,7 +46,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
       const daysAgo = Math.abs(diffDays);
       return {
         label: daysAgo === 1 ? "Ontem" : formatDate(dateObj),
-        colorClass: "bg-[--color-ios-red] dark:bg-[--color-ios-dark-red]",
+        colorClass: "bg-(--color-ios-red) dark:bg-(--color-ios-dark-red)",
         bgColorVar: "var(--color-ios-red)",
         textColorVar: "white",
       };

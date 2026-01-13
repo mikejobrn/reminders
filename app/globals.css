@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* iOS System Colors - Light Mode */
   --color-ios-blue: #007AFF;
@@ -65,6 +67,11 @@
 :root {
   --background: 255 255 255;
   --foreground: 0 0 0;
+}
+
+html.dark {
+  --background: 0 0 0;
+  --foreground: 255 255 255;
 }
 
 @media (prefers-color-scheme: dark) {

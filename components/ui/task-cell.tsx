@@ -49,8 +49,8 @@ export function TaskCell({
       className={`
         flex items-start gap-3 p-4
         bg-white dark:bg-black
-        border-b border-[--color-ios-gray-5] dark:border-[--color-ios-dark-gray-5]
-        hover:bg-[--color-ios-gray-6] dark:hover:bg-[--color-ios-dark-gray-5]
+        border-b border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)
+        hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-5)
         transition-colors duration-150
         cursor-pointer select-none
         min-h-[44px]
@@ -78,7 +78,7 @@ export function TaskCell({
             className={`
               text-[17px] leading-[22px] flex-1
               ${completed
-                ? "line-through text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-2]"
+                ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
                 : "text-black dark:text-white"
               }
             `}
@@ -94,8 +94,8 @@ export function TaskCell({
             className={`
               text-[15px] leading-[20px] mb-2
               ${completed
-                ? "text-[--color-ios-gray-2] dark:text-[--color-ios-dark-gray-3]"
-                : "text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-2]"
+                ? "text-(--color-ios-gray-2) dark:text-(--color-ios-dark-gray-3)"
+                : "text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
               }
             `}
           >
@@ -112,7 +112,7 @@ export function TaskCell({
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[13px] text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-2]"
+                  className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
                 >
                   #{tag}
                 </span>
@@ -121,7 +121,7 @@ export function TaskCell({
           )}
 
           {subtaskCount !== undefined && subtaskCount > 0 && (
-            <span className="text-[13px] text-[--color-ios-gray-1] dark:text-[--color-ios-dark-gray-2]">
+            <span className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)">
               {subtaskCount} subtarefa{subtaskCount !== 1 ? "s" : ""}
             </span>
           )}

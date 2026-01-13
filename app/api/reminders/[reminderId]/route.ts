@@ -8,11 +8,11 @@ import { DateTime } from "luxon";
 const updateReminderSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   notes: z.string().optional(),
-  sectionId: z.string().uuid().optional().nullable(),
-  parentId: z.string().uuid().optional().nullable(),
+  sectionId: z.string().min(1).optional().nullable(),
+  parentId: z.string().min(1).optional().nullable(),
   priority: z.number().int().min(0).max(3).optional(),
   flagged: z.boolean().optional(),
-  isCompleted: z.boolean().optional(),
+  completed: z.boolean().optional(),
   
   // Data e timezone
   dueDate: z.string().optional().nullable(),
@@ -28,10 +28,25 @@ const updateReminderSchema = z.object({
   rruleString: z.string().optional(),
   
   // Tags
-  tagIds: z.array(z.string().uuid()).optional(),
+  tagIds: z.array(z.string().min(1)).optional(),
   
   sortOrder: z.number().optional(),
 });
+
+const priorityFromNumber = (value: number) => {
+  switch (value) {
+    case 0:
+      return "NONE" as const;
+    case 1:
+      return "LOW" as const;
+    case 2:
+      return "MEDIUM" as const;
+    case 3:
+      return "HIGH" as const;
+    default:
+      return "NONE" as const;
+  }
+};
 
 // Helper para verificar permissão no lembrete
 async function checkReminderAccess(reminderId: string, userEmail: string) {
@@ -44,6 +59,7 @@ async function checkReminderAccess(reminderId: string, userEmail: string) {
   const reminder = await prisma.reminder.findUnique({
     where: { id: reminderId },
     include: {
+      recurrence: true,
       list: {
         include: {
           shares: {
@@ -63,7 +79,7 @@ async function checkReminderAccess(reminderId: string, userEmail: string) {
       user,
       reminder,
       isOwner: true,
-      role: "admin" as const,
+      role: "ADMIN" as const,
     };
   }
 
@@ -128,7 +144,7 @@ export async function GET(
             tag: true,
           },
         },
-        recurrenceRule: true,
+        recurrence: true,
         attachments: true,
         children: {
           where: {
@@ -195,7 +211,7 @@ export async function PATCH(
     const { reminderId } = await params;
     const access = await checkReminderAccess(reminderId, session.user.email);
 
-    if (!access.authorized || access.role === "viewer") {
+    if (!access.authorized || access.role === "VIEWER") {
       return NextResponse.json(
         { error: "Sem permissão para editar este lembrete" },
         { status: 403 }
@@ -207,15 +223,15 @@ export async function PATCH(
 
     // Se completar um lembrete recorrente, criar histórico
     if (
-      validatedData.isCompleted &&
-      !access.reminder?.isCompleted &&
-      access.reminder?.isRecurring
+      validatedData.completed &&
+      !access.reminder?.completed &&
+      access.reminder?.recurrence
     ) {
       await prisma.completionHistory.create({
         data: {
           reminderId: reminderId,
           completedAt: new Date(),
-          userId: access.user.id,
+          occurrenceDate: new Date(),
         },
       });
     }
@@ -243,7 +259,16 @@ export async function PATCH(
     }
 
     // Preparar dados para atualização
-    const { tagIds, rruleString, ...reminderData } = validatedData;
+    const {
+      tagIds,
+      rruleString,
+      dueDate,
+      isRecurring,
+      flagged,
+      url,
+      priority,
+      ...reminderData
+    } = validatedData;
 
     // Atualizar tags se fornecidas
     if (tagIds) {
@@ -279,7 +304,6 @@ export async function PATCH(
           data: {
             reminderId,
             rruleString,
-            userId: access.user.id,
           },
         });
       }
@@ -291,11 +315,22 @@ export async function PATCH(
     }
 
     // Atualizar lembrete
+    const completedAtUpdate =
+      typeof validatedData.completed === "boolean"
+        ? validatedData.completed
+          ? access.reminder?.completedAt ?? new Date()
+          : null
+        : undefined;
+
     const updatedReminder = await prisma.reminder.update({
       where: { id: reminderId },
       data: {
         ...reminderData,
+        ...(typeof priority === "number"
+          ? { priority: priorityFromNumber(priority) }
+          : {}),
         ...(utcDatetime !== undefined ? { utcDatetime } : {}),
+        ...(completedAtUpdate !== undefined ? { completedAt: completedAtUpdate } : {}),
         updatedAt: new Date(),
       },
       include: {
@@ -304,7 +339,7 @@ export async function PATCH(
             tag: true,
           },
         },
-        recurrenceRule: true,
+        recurrence: true,
         attachments: true,
         _count: {
           select: {
@@ -350,7 +385,7 @@ export async function DELETE(
     const { reminderId } = await params;
     const access = await checkReminderAccess(reminderId, session.user.email);
 
-    if (!access.authorized || access.role === "viewer") {
+    if (!access.authorized || access.role === "VIEWER") {
       return NextResponse.json(
         { error: "Sem permissão para deletar este lembrete" },
         { status: 403 }

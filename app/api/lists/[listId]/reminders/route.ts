@@ -8,9 +8,9 @@ import { DateTime } from "luxon";
 const createReminderSchema = z.object({
   title: z.string().min(1, "Título é obrigatório").max(500),
   notes: z.string().optional(),
-  listId: z.string().uuid("ID da lista inválido"),
-  sectionId: z.string().uuid().optional(),
-  parentId: z.string().uuid().optional(), // Para subtarefas
+  listId: z.string().min(1, "ID da lista inválido"),
+  sectionId: z.string().min(1).optional(),
+  parentId: z.string().min(1).optional(), // Para subtarefas
   priority: z.number().int().min(0).max(3).default(0),
   flagged: z.boolean().default(false),
   
@@ -28,13 +28,28 @@ const createReminderSchema = z.object({
   rruleString: z.string().optional(),
   
   // Tags
-  tagIds: z.array(z.string().uuid()).optional(),
+  tagIds: z.array(z.string().min(1)).optional(),
   
   sortOrder: z.number().optional(),
 });
 
 // Schema de validação para atualização
 const updateReminderSchema = createReminderSchema.partial();
+
+const priorityFromNumber = (value: number) => {
+  switch (value) {
+    case 0:
+      return "NONE" as const;
+    case 1:
+      return "LOW" as const;
+    case 2:
+      return "MEDIUM" as const;
+    case 3:
+      return "HIGH" as const;
+    default:
+      return "NONE" as const;
+  }
+};
 
 // Helper para verificar permissão na lista
 async function checkListAccess(listId: string, userEmail: string) {
@@ -53,11 +68,11 @@ async function checkListAccess(listId: string, userEmail: string) {
     },
   });
 
-  if (!list) return { authorized: false, user };
+  if (!list) return { authorized: false, user, notFound: true as const };
 
   // Dono tem acesso total
   if (list.userId === user.id) {
-    return { authorized: true, user, isOwner: true, role: "admin" as const };
+    return { authorized: true, user, isOwner: true, role: "ADMIN" as const };
   }
 
   // Compartilhado precisa ter pelo menos viewer
@@ -102,6 +117,13 @@ export async function GET(
     const { listId } = await params;
     const access = await checkListAccess(listId, session.user.email);
 
+    if ((access as any).notFound) {
+      return NextResponse.json(
+        { error: "Lista não encontrada" },
+        { status: 404 }
+      );
+    }
+
     if (!access.authorized) {
       return NextResponse.json(
         { error: "Sem permissão para acessar esta lista" },
@@ -121,7 +143,7 @@ export async function GET(
     };
 
     if (!includeCompleted) {
-      where.isCompleted = false;
+      where.completed = false;
     }
 
     // Filtrar por parent (para buscar subtarefas específicas ou tarefas raiz)
@@ -139,7 +161,7 @@ export async function GET(
             tag: true,
           },
         },
-        recurrenceRule: true,
+        recurrence: true,
         _count: {
           select: {
             children: {
@@ -152,7 +174,7 @@ export async function GET(
         },
       },
       orderBy: [
-        { isCompleted: "asc" },
+        { completed: "asc" },
         { sortOrder: "asc" },
         { createdAt: "desc" },
       ],
@@ -182,7 +204,14 @@ export async function POST(
     const { listId } = await params;
     const access = await checkListAccess(listId, session.user.email);
 
-    if (!access.authorized || access.role === "viewer") {
+    if ((access as any).notFound) {
+      return NextResponse.json(
+        { error: "Lista não encontrada" },
+        { status: 404 }
+      );
+    }
+
+    if (!access.authorized || access.role === "VIEWER") {
       return NextResponse.json(
         { error: "Sem permissão para criar lembretes nesta lista" },
         { status: 403 }
@@ -226,21 +255,20 @@ export async function POST(
     }
 
     // Criar lembrete
-    const { tagIds, rruleString, ...reminderData } = validatedData;
+    const { tagIds, rruleString, dueDate, isRecurring, flagged, url, priority, ...reminderData } = validatedData;
     
     const newReminder = await prisma.reminder.create({
       data: {
         ...reminderData,
+        priority: priorityFromNumber(priority),
         sortOrder,
         utcDatetime,
-        userId: access.user.id,
         // Criar recorrência se fornecida
         ...(rruleString && validatedData.isRecurring
           ? {
-              recurrenceRule: {
+              recurrence: {
                 create: {
                   rruleString,
-                  userId: access.user.id,
                 },
               },
             }
@@ -264,7 +292,7 @@ export async function POST(
             tag: true,
           },
         },
-        recurrenceRule: true,
+        recurrence: true,
         _count: {
           select: {
             children: true,
