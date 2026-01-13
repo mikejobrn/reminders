@@ -38,6 +38,14 @@ interface List {
   incompleteCount: number;
 }
 
+const SMART_LISTS: Record<string, { name: string; color: string; icon: string; allowCreate: boolean; includeCompleted?: boolean }> = {
+  today: { name: "Hoje", color: "#007AFF", icon: "calendar-outline", allowCreate: false },
+  scheduled: { name: "Agendados", color: "#FF3B30", icon: "calendar-outline", allowCreate: false },
+  all: { name: "Todos", color: "#8E8E93", icon: "list-outline", allowCreate: false },
+  flagged: { name: "Sinalizados", color: "#FF9500", icon: "flag-outline", allowCreate: false },
+  completed: { name: "Concluídos", color: "#8E8E93", icon: "checkmark-circle-outline", allowCreate: false, includeCompleted: true },
+};
+
 export default function ListDetailPage({
   params,
 }: {
@@ -60,9 +68,28 @@ export default function ListDetailPage({
   }, [listId]);
 
   const fetchListAndReminders = async () => {
-    
     try {
       setLoading(true);
+
+      const smart = SMART_LISTS[listId];
+      if (smart) {
+        setList({ id: listId, name: smart.name, color: smart.color, icon: smart.icon, incompleteCount: 0 });
+
+        const query = new URLSearchParams();
+        query.set("parentId", "null");
+        if (smart.includeCompleted) query.set("includeCompleted", "true");
+
+        const remindersResponse = await fetch(`/api/smart-lists/${listId}/reminders?${query.toString()}`);
+        if (remindersResponse.status === 401) {
+          router.replace(`/login?callbackUrl=${encodeURIComponent(`/lists/${listId}`)}`);
+          return;
+        }
+        if (!remindersResponse.ok) throw new Error("Erro ao carregar lembretes");
+
+        const remindersData = await remindersResponse.json();
+        setReminders(remindersData);
+        return;
+      }
       
       // Carregar lista
       const listResponse = await fetch(`/api/lists/${listId}`);
@@ -237,7 +264,12 @@ export default function ListDetailPage({
                 setEditingReminder(undefined);
                 setShowReminderModal(true);
               }}
-              className="p-3 bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white rounded-full hover:opacity-80 transition-opacity"
+              disabled={!!SMART_LISTS[listId] && !SMART_LISTS[listId].allowCreate}
+              className={`p-3 text-white rounded-full transition-opacity ${
+                !!SMART_LISTS[listId] && !SMART_LISTS[listId].allowCreate
+                  ? "bg-(--color-ios-gray-4) dark:bg-(--color-ios-dark-gray-4) opacity-60 cursor-not-allowed"
+                  : "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) hover:opacity-80"
+              }`}
             >
               <IoAdd size={24} />
             </button>
@@ -250,7 +282,9 @@ export default function ListDetailPage({
         {reminders.length === 0 ? (
           <div className="text-center py-16 text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
             <p>Nenhum lembrete</p>
-            <p className="text-sm mt-2">Toque em + para adicionar</p>
+            <p className="text-sm mt-2">
+              {SMART_LISTS[listId] ? "Nada para mostrar aqui" : "Toque em + para adicionar"}
+            </p>
           </div>
         ) : (
           <>

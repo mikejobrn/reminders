@@ -25,7 +25,7 @@ export function ListHeader({
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {icon && (
           <div
-            className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
+            className="flex items-center justify-center w-9 h-9 rounded-full shrink-0 text-white"
             style={{ backgroundColor: color }}
           >
             {icon}

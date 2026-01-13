@@ -23,6 +23,7 @@ interface List {
 
 export default function ListsPage() {
   const [lists, setLists] = useState<List[]>([]);
+  const [smartLists, setSmartLists] = useState<Array<{ id: string; name: string; icon: string; color: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewListDialog, setShowNewListDialog] = useState(false);
@@ -34,6 +35,7 @@ export default function ListsPage() {
   // Carregar listas
   useEffect(() => {
     fetchLists();
+    fetchSmartLists();
   }, []);
 
   const fetchLists = async () => {
@@ -56,6 +58,28 @@ export default function ListsPage() {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSmartLists = async () => {
+    try {
+      const response = await fetch("/api/smart-lists");
+
+      if (response.status === 401 || response.status === 403) {
+        router.replace(`/login?callbackUrl=${encodeURIComponent("/lists")}`);
+        return;
+      }
+
+      if (!response.ok) {
+        // Não trava a tela toda se smart lists falharem
+        setSmartLists([]);
+        return;
+      }
+
+      const data = await response.json();
+      setSmartLists(Array.isArray(data) ? data : []);
+    } catch {
+      setSmartLists([]);
     }
   };
 
@@ -98,27 +122,28 @@ export default function ListsPage() {
 
   // Listas inteligentes padrão
   const renderIcon = (icon?: string, color?: string) => {
-    const iconColor = color ?? "#007AFF";
     switch (icon) {
       case "calendar-outline":
-        return <IoCalendarOutline size={20} color={iconColor} />;
+        return <IoCalendarOutline size={20} />;
       case "flag-outline":
-        return <IoFlagOutline size={20} color={iconColor} />;
+        return <IoFlagOutline size={20} />;
       case "checkmark-circle-outline":
-        return <IoCheckmarkCircleOutline size={20} color={iconColor} />;
+        return <IoCheckmarkCircleOutline size={20} />;
       case "list-outline":
       default:
-        return <IoListOutline size={20} color={iconColor} />;
+        return <IoListOutline size={20} />;
     }
   };
 
-  const smartLists = [
+  const fallbackSmartLists = [
     { id: "today", name: "Hoje", icon: "calendar-outline", color: "#007AFF", count: 0 },
     { id: "scheduled", name: "Agendados", icon: "calendar-outline", color: "#FF3B30", count: 0 },
     { id: "all", name: "Todos", icon: "list-outline", color: "#8E8E93", count: 0 },
     { id: "flagged", name: "Sinalizados", icon: "flag-outline", color: "#FF9500", count: 0 },
     { id: "completed", name: "Concluídos", icon: "checkmark-circle-outline", color: "#8E8E93", count: 0 },
   ];
+
+  const effectiveSmartLists = smartLists.length > 0 ? smartLists : fallbackSmartLists;
 
   if (loading) {
     return (
@@ -174,19 +199,28 @@ export default function ListsPage() {
           <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) mb-3 px-2">
             Listas Inteligentes
           </h2>
-          <div className="space-y-2">
-            {smartLists.map((list) => (
+          <div className="grid grid-cols-2 gap-3">
+            {effectiveSmartLists.map((list) => (
               <button
                 key={list.id}
                 onClick={() => handleListClick(list.id)}
-                className="w-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5) rounded-xl px-4 py-3 transition-colors"
+                className="text-left rounded-2xl p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5) transition-colors"
               >
-                <ListHeader
-                  icon={renderIcon(list.icon, list.color)}
-                  title={list.name}
-                  count={list.count}
-                  color={list.color}
-                />
+                <div className="flex items-start justify-between gap-3">
+                  <div
+                    className="flex items-center justify-center w-10 h-10 rounded-full text-white shrink-0"
+                    style={{ backgroundColor: list.color }}
+                    aria-hidden
+                  >
+                    {renderIcon(list.icon, list.color)}
+                  </div>
+                  <div className="tabular-nums text-[22px] leading-[28px] font-semibold text-black dark:text-white">
+                    {list.count}
+                  </div>
+                </div>
+                <div className="mt-2 text-[17px] leading-[22px] font-semibold text-black dark:text-white truncate">
+                  {list.name}
+                </div>
               </button>
             ))}
           </div>
