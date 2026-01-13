@@ -11,7 +11,12 @@ async function getAccessibleListIds(userId: string): Promise<string[]> {
     prisma.listShare.findMany({ where: { sharedWithId: userId }, select: { listId: true } }),
   ]);
 
-  return Array.from(new Set([...ownLists.map((l) => l.id), ...shared.map((s) => s.listId)]));
+  return Array.from(
+    new Set([
+      ...ownLists.map((l: { id: string }) => l.id),
+      ...shared.map((s: { listId: string }) => s.listId),
+    ])
+  );
 }
 
 export async function GET(
