@@ -17,7 +17,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const targetDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-    
+
     const diffTime = targetDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -30,7 +30,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
         textColorVar: "white",
       };
     }
-    
+
     // Tomorrow
     if (diffDays === 1) {
       return {
@@ -40,7 +40,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
         textColorVar: "white",
       };
     }
-    
+
     // Yesterday or overdue
     if (diffDays < 0) {
       const daysAgo = Math.abs(diffDays);
@@ -51,7 +51,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
         textColorVar: "white",
       };
     }
-    
+
     // Future dates
     return {
       label: formatDate(dateObj, showTime),
@@ -63,6 +63,7 @@ export function DateBadge({ date, className = "", showTime = false }: DateBadgeP
 
   return (
     <span
+      suppressHydrationWarning
       className={`
         inline-flex items-center justify-center
         px-2 py-0.5 rounded-full
@@ -92,12 +93,12 @@ function formatDate(date: Date, withTime = false): string {
     day: "numeric",
     month: "short",
   };
-  
+
   const formatted = date.toLocaleDateString("pt-BR", options);
-  
+
   if (withTime) {
     return `${formatted} às ${formatTime(date)}`;
   }
-  
+
   return formatted;
 }

@@ -21,12 +21,12 @@ export function CheckboxIOS({
 
   const handleClick = () => {
     if (disabled) return;
-    
-    // Haptic feedback
-    if (typeof window !== "undefined" && "vibrate" in navigator) {
+
+    // Haptic feedback (apenas no cliente)
+    if ("vibrate" in navigator) {
       navigator.vibrate(10);
     }
-    
+
     onChange?.(!checked);
   };
 

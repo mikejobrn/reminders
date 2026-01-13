@@ -119,7 +119,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
         notes: notes.trim() || undefined,
         priority,
         flagged,
-          dueDate: dueDate?.toISOString(),
+        dueDate: dueDate?.toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         listId,
         tagIds: selectedTagIds,
@@ -135,28 +135,30 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
   const formatDate = (date: Date | null) => {
     if (!date) return "Adicionar data";
-    
-    const today = new Date();
-    const tomorrow = new Date(today);
+
+    // Usar Date.now() cache para evitar hydration mismatch
+    const now = Date.now();
+    const today = new Date(now);
+    const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const dateStr = date.toLocaleDateString("pt-BR", {
       day: "numeric",
       month: "short",
       year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
     });
-    
+
     const timeStr = date.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
     });
-    
+
     if (date.toDateString() === today.toDateString()) {
       return `Hoje, ${timeStr}`;
     } else if (date.toDateString() === tomorrow.toDateString()) {
       return `Amanhã, ${timeStr}`;
     }
-    
+
     return `${dateStr}, ${timeStr}`;
   };
 
@@ -295,11 +297,10 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
                       setPriority(index);
                       setShowPriorityPicker(false);
                     }}
-                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
-                      priority === index
+                    className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${priority === index
                         ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white"
                         : "bg-white dark:bg-(--color-ios-dark-gray-6) text-black dark:text-white hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5)"
-                    }`}
+                      }`}
                   >
                     <span className="text-[17px]">{label}</span>
                     {priorityIcons[index] && (
@@ -331,16 +332,14 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
                 </span>
               </div>
               <div
-                className={`w-12 h-7 rounded-full transition-colors ${
-                  flagged
+                className={`w-12 h-7 rounded-full transition-colors ${flagged
                     ? "bg-(--color-ios-orange) dark:bg-(--color-ios-dark-orange)"
                     : "bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-4)"
-                }`}
+                  }`}
               >
                 <div
-                  className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
-                    flagged ? "translate-x-6" : "translate-x-1"
-                  } mt-1`}
+                  className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${flagged ? "translate-x-6" : "translate-x-1"
+                    } mt-1`}
                 />
               </div>
             </button>
@@ -390,11 +389,10 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
                             : [...prev, tag.id]
                         )
                       }
-                      className={`px-3 py-1 rounded-full text-[14px] border transition-colors ${
-                        selected
+                      className={`px-3 py-1 rounded-full text-[14px] border transition-colors ${selected
                           ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white border-transparent"
                           : "bg-white dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-4) hover:border-(--color-ios-blue)"
-                      }`}
+                        }`}
                     >
                       #{tag.name}
                     </button>

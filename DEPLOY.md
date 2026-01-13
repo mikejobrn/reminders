@@ -281,6 +281,21 @@ npx prisma migrate deploy
 3. Certifique-se de ter ícones em `/public/icons/`
 4. PWA só funciona em HTTPS (Vercel já fornece)
 
+### Erro de Hydration: "server rendered HTML didn't match the client"
+
+**Causa:** O HTML renderizado no servidor é diferente do HTML renderizado no cliente, geralmente causado por:
+- Uso de `Date.now()` ou `new Date()` que gera valores diferentes
+- Uso de `typeof window !== 'undefined'` no render inicial
+- APIs do navegador usadas antes da hidratação
+
+**Solução:**
+1. Use `suppressHydrationWarning` em elementos que dependem de tempo/data
+2. Mova lógica dependente do cliente para `useEffect`
+3. Evite verificações de `typeof window` em estados iniciais
+4. Use estados padrão neutros no servidor
+
+O projeto já está configurado para evitar esses problemas nos componentes principais.
+
 ### Fontes não carregam
 
 **Solução:**

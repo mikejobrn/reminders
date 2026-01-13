@@ -11,16 +11,19 @@ interface BeforeInstallPromptEvent extends Event {
 export function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [showPrompt, setShowPrompt] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !window.matchMedia("(display-mode: standalone)").matches;
-  });
+  const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
+    // Verificar se está rodando como standalone (já instalado)
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
+    if (isStandalone) {
+      return;
+    }
+
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
+
       // Verificar se já foi instalado ou se o usuário já recusou
       const dismissed = localStorage.getItem("pwa-install-dismissed");
       if (!dismissed) {
@@ -60,7 +63,7 @@ export function PWAInstallPrompt() {
           <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) flex items-center justify-center">
             <IoDownloadOutline className="w-6 h-6 text-white" />
           </div>
-          
+
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-[15px] text-(--color-ios-label) dark:text-(--color-ios-dark-label) mb-1">
               Instalar Lembretes
@@ -68,7 +71,7 @@ export function PWAInstallPrompt() {
             <p className="text-[13px] text-(--color-ios-secondary-label) dark:text-(--color-ios-dark-secondary-label) leading-relaxed">
               Instale o app na sua tela inicial para acesso rápido e notificações
             </p>
-            
+
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleInstall}
@@ -84,7 +87,7 @@ export function PWAInstallPrompt() {
               </button>
             </div>
           </div>
-          
+
           <button
             onClick={handleDismiss}
             className="flex-shrink-0 w-7 h-7 rounded-full hover:bg-(--color-ios-light-gray-3) dark:hover:bg-(--color-ios-dark-gray-4) flex items-center justify-center transition-colors"
