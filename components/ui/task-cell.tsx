@@ -1,9 +1,10 @@
 "use client";
 
-import { ReactNode } from "react";
+import React, { ReactNode, useEffect, useRef } from "react";
 import { CheckboxIOS } from "./checkbox-ios";
 import { DateBadge } from "./date-badge";
 import { PriorityBadge } from "./priority-badge";
+import { IoInformationCircleOutline } from "react-icons/io5";
 
 interface TaskCellProps {
   id: string;
@@ -16,7 +17,17 @@ interface TaskCellProps {
   tags?: string[];
   subtaskCount?: number;
   onToggle?: (id: string) => void;
-  onClick?: (id: string) => void;
+  // onClick: id, optional mouse event, optional caret position when clicking inside title
+  onClick?: (id: string, e?: React.MouseEvent, caretPos?: number) => void;
+  onInfoClick?: (id: string) => void;
+  isEditing?: boolean;
+  editValue?: string;
+  onEditChange?: (value: string) => void;
+  onEditSubmit?: () => void;
+  onEditCancel?: () => void;
+  canEdit?: boolean;
+  // initial caret position when entering edit mode
+  initialCaretPos?: number | null;
   className?: string;
   children?: ReactNode;
 }
@@ -33,87 +44,134 @@ export function TaskCell({
   subtaskCount,
   onToggle,
   onClick,
+  onInfoClick,
+  isEditing = false,
+  editValue,
+  onEditChange,
+  onEditSubmit,
+  onEditCancel,
+  canEdit = true,
+  initialCaretPos = null,
   className = "",
   children,
 }: TaskCellProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    const val = el.value ?? "";
+    if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
+      const pos = Math.min(initialCaretPos, val.length);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const len = val.length;
+      el.setSelectionRange(len, len);
+    }
+  }, [isEditing, initialCaretPos]);
+
   const handleCheckboxChange = (checked: boolean) => {
+    if (!canEdit) return;
     onToggle?.(id);
   };
 
-  const handleCellClick = () => {
-    onClick?.(id);
+  const handleCellClick = (e: React.MouseEvent) => {
+    if (!canEdit) return;
+    // if clicked inside input, let input's mouseUp handler provide caret
+    if (e.target === inputRef.current) return;
+    onClick?.(id, e, undefined);
+  };
+
+  const handleContainerKeyDown = (e: React.KeyboardEvent) => {
+    if (!canEdit) return;
+    if (isEditing) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick?.(id);
+    }
   };
 
   return (
     <div
-      className={`
-        flex items-start gap-3 p-4
+      className={
+        `group flex items-start gap-3 p-4
         bg-white dark:bg-black
         border-b border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)
         hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-5)
         transition-colors duration-150
-        cursor-pointer select-none
+        ${canEdit ? "cursor-pointer" : "cursor-default"} select-none
         min-h-[44px]
-        ${className}
-      `}
+        ${className}`
+      }
       onClick={handleCellClick}
+      onKeyDown={handleContainerKeyDown}
+      tabIndex={canEdit ? 0 : -1}
+      role={canEdit ? "button" : undefined}
+      aria-label={canEdit ? "Editar título da tarefa" : "Tarefa"}
     >
-      {/* Checkbox */}
-      <div
-        className="flex-shrink-0 mt-0.5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <CheckboxIOS
-          checked={completed}
-          onChange={handleCheckboxChange}
-          color={color}
-        />
+      <div className="flex-shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
+        <CheckboxIOS checked={completed} onChange={handleCheckboxChange} color={color} />
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Title and Priority */}
         <div className="flex items-center gap-2 mb-1">
-          <span
-            className={`
-              text-[17px] leading-[22px] flex-1
-              ${completed
-                ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-                : "text-black dark:text-white"
+          <input
+            ref={inputRef}
+            value={isEditing ? (editValue ?? title) : title}
+            readOnly={!isEditing}
+            onChange={(e) => onEditChange?.(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onMouseUp={(e) => {
+              if (!isEditing) {
+                const pos = inputRef.current?.selectionStart ?? undefined;
+                onClick?.(id, e as React.MouseEvent, pos);
               }
-            `}
-          >
-            {title}
-          </span>
+            }}
+            disabled={!canEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onEditSubmit?.();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                onEditCancel?.();
+              }
+            }}
+            onBlur={() => onEditSubmit?.()}
+            className={
+              `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1 ` +
+              (completed
+                ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
+                : "text-black dark:text-white")
+            }
+            aria-label="Título da tarefa"
+          />
           {priority !== "none" && <PriorityBadge priority={priority} />}
         </div>
 
-        {/* Notes */}
         {notes && (
           <p
-            className={`
-              text-[15px] leading-[20px] mb-2
-              ${completed
+            className={
+              `text-[15px] leading-[20px] mb-2 ` +
+              (completed
                 ? "text-(--color-ios-gray-2) dark:text-(--color-ios-dark-gray-3)"
-                : "text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-              }
-            `}
+                : "text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)")
+            }
           >
             {notes}
           </p>
         )}
 
-        {/* Metadata row */}
         <div className="flex items-center gap-2 flex-wrap">
           {dueDate && <DateBadge date={dueDate} />}
-          
+
           {tags && tags.length > 0 && (
             <div className="flex gap-1">
               {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-                >
+                <span key={tag} className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)">
                   #{tag}
                 </span>
               ))}
@@ -127,8 +185,28 @@ export function TaskCell({
           )}
         </div>
 
-        {/* Children (subtasks) */}
         {children && <div className="mt-2">{children}</div>}
+      </div>
+
+      <div className="flex-shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!canEdit) return;
+            onInfoClick?.(id);
+          }}
+          disabled={!canEdit}
+          className={
+            `p-1 rounded-full transition-opacity ` +
+            `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 ` +
+            `hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-5) ` +
+            `disabled:opacity-30 disabled:cursor-not-allowed`
+          }
+          aria-label="Detalhes"
+        >
+          <IoInformationCircleOutline size={22} className="text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)" />
+        </button>
       </div>
     </div>
   );

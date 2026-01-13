@@ -36,6 +36,8 @@ interface List {
   color?: string;
   icon?: string;
   incompleteCount: number;
+  isOwner?: boolean;
+  role?: "viewer" | "editor" | "admin";
 }
 
 const SMART_LISTS: Record<string, { name: string; color: string; icon: string; allowCreate: boolean; includeCompleted?: boolean }> = {
@@ -60,20 +62,22 @@ export default function ListDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | undefined>(undefined);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState<string>("");
+  const [savingTitleId, setSavingTitleId] = useState<string | null>(null);
+  const [newReminderTitle, setNewReminderTitle] = useState<string>("");
+  const [creatingReminder, setCreatingReminder] = useState<boolean>(false);
   const router = useRouter();
 
-  // Carregar lista e lembretes
-  useEffect(() => {
-    fetchListAndReminders();
-  }, [listId]);
+  const newReminderInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const fetchListAndReminders = async () => {
+  const fetchListAndReminders = React.useCallback(async () => {
     try {
       setLoading(true);
 
       const smart = SMART_LISTS[listId];
       if (smart) {
-        setList({ id: listId, name: smart.name, color: smart.color, icon: smart.icon, incompleteCount: 0 });
+        setList({ id: listId, name: smart.name, color: smart.color, icon: smart.icon, incompleteCount: 0, role: "viewer" });
 
         const query = new URLSearchParams();
         query.set("parentId", "null");
@@ -129,7 +133,12 @@ export default function ListDetailPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [listId, router]);
+
+  // Carregar lista e lembretes
+  useEffect(() => {
+    fetchListAndReminders();
+  }, [fetchListAndReminders]);
 
   // Salvar lembrete (novo ou edição)
   const handleSaveReminder = async (data: ReminderData) => {
@@ -203,6 +212,135 @@ export default function ListDetailPage({
     }
   };
 
+  const canCreateInThisView = !SMART_LISTS[listId];
+  const canEditInThisView = !SMART_LISTS[listId] && (list?.role ?? "admin") !== "viewer";
+
+  const beginInlineEdit = (reminder: Reminder) => {
+    if (!canEditInThisView) return;
+    setEditingTitleId(reminder.id);
+    setEditingTitleValue(reminder.title);
+  };
+
+  const beginInlineEditWithCaret = (reminder: Reminder, caretPos?: number) => {
+    if (!canEditInThisView) return;
+    setEditingTitleId(reminder.id);
+    setEditingTitleValue(reminder.title);
+    // store caret position in a temporary prop by embedding in reminder object? store separately
+    setTimeout(() => {
+      // no-op: caret will be passed via TaskCell prop from parent state below
+    }, 0);
+    // we set a per-id caret mapping
+    setInitialCaretForId((prev) => ({ ...prev, [reminder.id]: typeof caretPos === 'number' ? caretPos : null }));
+  };
+
+  const [initialCaretForId, setInitialCaretForId] = useState<Record<string, number | null>>({});
+
+  const consumeInitialCaret = (id: string) => {
+    const v = initialCaretForId[id] ?? null;
+    // remove after consuming
+    setInitialCaretForId((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    return v;
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingTitleId(null);
+    setEditingTitleValue("");
+  };
+
+  const saveInlineTitle = async (reminderId: string) => {
+    if (!canEditInThisView) return;
+
+    const reminder = reminders.find((r) => r.id === reminderId);
+    if (!reminder) {
+      cancelInlineEdit();
+      return;
+    }
+
+    const nextTitle = editingTitleValue.trim();
+    if (!nextTitle) {
+      // Não permite título vazio; reverte.
+      cancelInlineEdit();
+      return;
+    }
+
+    if (nextTitle === reminder.title) {
+      cancelInlineEdit();
+      return;
+    }
+
+    setSavingTitleId(reminderId);
+    try {
+      // Otimista
+      setReminders((prev) =>
+        prev.map((r) => (r.id === reminderId ? { ...r, title: nextTitle } : r))
+      );
+
+      const response = await fetch(`/api/reminders/${reminderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: nextTitle,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao atualizar lembrete");
+      }
+
+      const updatedReminder = await response.json();
+      setReminders((prev) =>
+        prev.map((r) => (r.id === reminderId ? updatedReminder : r))
+      );
+    } catch (err) {
+      // Reverte (melhor do que deixar inconsistente)
+      setReminders((prev) =>
+        prev.map((r) => (r.id === reminderId ? { ...r, title: reminder.title } : r))
+      );
+      alert(err instanceof Error ? err.message : "Erro ao atualizar lembrete");
+    } finally {
+      setSavingTitleId(null);
+      cancelInlineEdit();
+    }
+  };
+
+  const createReminderInline = async () => {
+    if (!canCreateInThisView || !canEditInThisView) return;
+    const title = newReminderTitle.trim();
+    if (!title) return;
+
+    setCreatingReminder(true);
+    try {
+      const response = await fetch(`/api/lists/${listId}/reminders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+          listId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao criar lembrete");
+      }
+
+      const newReminder = await response.json();
+      setReminders((prev) => [...prev, newReminder]);
+      setNewReminderTitle("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao criar lembrete");
+    } finally {
+      setCreatingReminder(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
@@ -234,7 +372,7 @@ export default function ListDetailPage({
   const completedTasks = reminders.filter((r) => r.completed);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-black pb-28">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-black border-b border-(--color-ios-gray-6) dark:border-(--color-ios-dark-gray-6)">
         <div className="max-w-3xl mx-auto px-4 py-4">
@@ -259,20 +397,7 @@ export default function ListDetailPage({
                 {incompleteTasks.length} {incompleteTasks.length === 1 ? "tarefa" : "tarefas"}
               </p>
             </div>
-            <button
-              onClick={() => {
-                setEditingReminder(undefined);
-                setShowReminderModal(true);
-              }}
-              disabled={!!SMART_LISTS[listId] && !SMART_LISTS[listId].allowCreate}
-              className={`p-3 text-white rounded-full transition-opacity ${
-                !!SMART_LISTS[listId] && !SMART_LISTS[listId].allowCreate
-                  ? "bg-(--color-ios-gray-4) dark:bg-(--color-ios-dark-gray-4) opacity-60 cursor-not-allowed"
-                  : "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) hover:opacity-80"
-              }`}
-            >
-              <IoAdd size={24} />
-            </button>
+            <div className="h-12" />
           </div>
         </div>
       </div>
@@ -283,7 +408,7 @@ export default function ListDetailPage({
           <div className="text-center py-16 text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
             <p>Nenhum lembrete</p>
             <p className="text-sm mt-2">
-              {SMART_LISTS[listId] ? "Nada para mostrar aqui" : "Toque em + para adicionar"}
+              {SMART_LISTS[listId] ? "Nada para mostrar aqui" : "Digite um título e pressione ENTER"}
             </p>
           </div>
         ) : (
@@ -305,7 +430,16 @@ export default function ListDetailPage({
                     tags={reminder.tags.map((t) => t.tag.name)}
                     subtaskCount={reminder._count.children}
                     onToggle={(id) => handleToggleReminder(id, true)}
-                    onClick={() => {
+                    canEdit={canEditInThisView && savingTitleId !== reminder.id}
+                    isEditing={editingTitleId === reminder.id}
+                    editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                    onEditChange={setEditingTitleValue}
+                    onEditCancel={cancelInlineEdit}
+                    onEditSubmit={() => saveInlineTitle(reminder.id)}
+                    onClick={(id, e, caret) => beginInlineEditWithCaret(reminder, caret)}
+                    initialCaretPos={initialCaretForId[reminder.id] ?? null}
+                    onInfoClick={() => {
+                      if (!canEditInThisView) return;
                       setEditingReminder(reminder);
                       setShowReminderModal(true);
                     }}
@@ -335,7 +469,16 @@ export default function ListDetailPage({
                       tags={reminder.tags.map((t) => t.tag.name)}
                       subtaskCount={reminder._count.children}
                       onToggle={(id) => handleToggleReminder(id, false)}
-                      onClick={() => {
+                      canEdit={canEditInThisView && savingTitleId !== reminder.id}
+                      isEditing={editingTitleId === reminder.id}
+                      editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                      onEditChange={setEditingTitleValue}
+                      onEditCancel={cancelInlineEdit}
+                      onEditSubmit={() => saveInlineTitle(reminder.id)}
+                      onClick={(id, e, caret) => beginInlineEditWithCaret(reminder, caret)}
+                      initialCaretPos={initialCaretForId[reminder.id] ?? null}
+                      onInfoClick={() => {
+                        if (!canEditInThisView) return;
                         setEditingReminder(reminder);
                         setShowReminderModal(true);
                       }}
@@ -346,7 +489,64 @@ export default function ListDetailPage({
             )}
           </>
         )}
+
+        {/* Criar novo lembrete inline */}
+        {!SMART_LISTS[listId] && (
+          <div className="mt-6" id="new-reminder-row">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6)">
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white flex items-center justify-center">
+                <IoAdd size={18} />
+              </div>
+              <input
+                ref={newReminderInputRef}
+                value={newReminderTitle}
+                onChange={(e) => setNewReminderTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    createReminderInline();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setNewReminderTitle("");
+                  }
+                }}
+                disabled={!canEditInThisView || creatingReminder}
+                placeholder={canEditInThisView ? "Novo lembrete" : "Somente leitura"}
+                className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1) disabled:opacity-60"
+                aria-label="Novo lembrete"
+              />
+              {creatingReminder && (
+                <span className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">Criando…</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* FAB + */}
+      {!SMART_LISTS[listId] && (
+        <button
+          type="button"
+          onClick={() => {
+            // Garante que não fica editando um título enquanto cria um novo
+            cancelInlineEdit();
+            newReminderInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+            // Pequeno delay ajuda no iOS/Safari após scroll
+            setTimeout(() => newReminderInputRef.current?.focus(), 150);
+          }}
+          disabled={!canEditInThisView}
+          className={
+            `fixed z-20 bottom-6 right-6 p-4 rounded-full shadow-lg transition-opacity ` +
+            (canEditInThisView
+              ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white hover:opacity-90"
+              : "bg-(--color-ios-gray-4) dark:bg-(--color-ios-dark-gray-4) text-white opacity-60 cursor-not-allowed")
+          }
+          aria-label="Adicionar lembrete"
+        >
+          <IoAdd size={26} />
+        </button>
+      )}
 
       <ReminderModal
         isOpen={showReminderModal}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   IoAdd,
@@ -32,13 +32,7 @@ export default function ListsPage() {
   const [newListIcon, setNewListIcon] = useState("list-outline");
   const router = useRouter();
 
-  // Carregar listas
-  useEffect(() => {
-    fetchLists();
-    fetchSmartLists();
-  }, []);
-
-  const fetchLists = async () => {
+  const fetchLists = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch("/api/lists");
@@ -59,9 +53,9 @@ export default function ListsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
-  const fetchSmartLists = async () => {
+  const fetchSmartLists = useCallback(async () => {
     try {
       const response = await fetch("/api/smart-lists");
 
@@ -81,7 +75,13 @@ export default function ListsPage() {
     } catch {
       setSmartLists([]);
     }
-  };
+  }, [router]);
+
+  // Carregar listas
+  useEffect(() => {
+    fetchLists();
+    fetchSmartLists();
+  }, [fetchLists, fetchSmartLists]);
 
   // Criar nova lista
   const handleCreateList = async (e: React.FormEvent) => {
