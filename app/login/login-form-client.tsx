@@ -19,20 +19,25 @@ export default function LoginFormClient({ action }: LoginFormClientProps) {
         setError("");
         setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
-    
-    try {
-      const result = await action(formData);
-      
-      if (result?.error) {
-        setError(result.error);
-        setLoading(false);
-      }
-      // Se não houver erro, o redirect acontece automaticamente
-    } catch (err) {
-      // Não fazemos nada - deixamos o Next.js lidar com o redirect
-      // O erro de redirect é normal e esperado
-      console.log("[CLIENT] Action threw (probably redirect):", err);
+        const formData = new FormData(e.currentTarget);
+        
+        try {
+            const result = await action(formData);
+            
+            if (result?.error) {
+                setError(result.error);
+                setLoading(false);
+            }
+            // Se não houver erro, o redirect acontece automaticamente
+        } catch (err) {
+            // Não fazemos nada - deixamos o Next.js lidar com o redirect
+            // O erro de redirect é normal e esperado
+            console.log("[CLIENT] Action threw (probably redirect):", err);
+        }
+    };
+
+    return (
+        <>
             <div className="bg-white dark:bg-(--color-ios-dark-gray-6) rounded-[10px] shadow-sm overflow-hidden mb-4">
                 <form onSubmit={handleSubmit}>
                     {error && (
