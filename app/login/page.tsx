@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import LoginFormClient from "./login-form-client";
@@ -19,6 +18,9 @@ async function handleLogin(formData: FormData) {
     // Re-throw para o Next.js lidar com REDIRECT_ERROR
     throw error;
   }
+}
+
+export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-(--color-ios-gray-6) dark:bg-black px-4">
       <div className="w-full max-w-md">
