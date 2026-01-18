@@ -5,7 +5,7 @@ import LoginFormClient from "./login-form-client";
 
 async function handleLogin(formData: FormData) {
   "use server";
-  
+
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -17,17 +17,17 @@ async function handleLogin(formData: FormData) {
       password,
       redirect: false,
     });
-    
+
     console.log("[LOGIN] Sign in successful");
   } catch (error) {
     console.error("[LOGIN] Sign in error:", error);
-    
+
     if (error instanceof AuthError) {
       return { error: "Email ou senha inválidos" };
     }
     throw error;
   }
-  
+
   // Se chegou aqui, login foi bem sucedido
   redirect("/lists");
 }

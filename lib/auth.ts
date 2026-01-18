@@ -22,7 +22,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         try {
           console.log("[AUTH] Authorize started", { email: credentials?.email });
-          
+
           if (!credentials?.email || !credentials?.password) {
             console.log("[AUTH] Missing credentials");
             return null;
@@ -66,13 +66,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
-    
+
     // TODO: Adicionar depois que configurar OAuth apps
     // Google({
     //   clientId: process.env.GOOGLE_CLIENT_ID!,
     //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     // }),
-    
+
     // Apple({
     //   clientId: process.env.APPLE_CLIENT_ID!,
     //   clientSecret: process.env.APPLE_CLIENT_SECRET!,
