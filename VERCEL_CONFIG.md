@@ -2,13 +2,37 @@
 
 ## ✅ Problema Resolvido!
 
-O login não funcionava porque **o banco de dados estava vazio** (sem usuários). As variáveis de ambiente estavam configuradas corretamente, mas as migrations haviam sido aplicadas, porém nenhum usuário foi criado.
+### Causa Raiz:
+
+**NextAuth v5 com Credentials provider e `strategy: "jwt"` não pode usar PrismaAdapter.**
+
+O código estava configurado assim:
+```typescript
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma), // ❌ Incompatível com JWT + Credentials
+  session: { strategy: "jwt" },
+  providers: [Credentials({...})]
+})
+```
+
+Isso causava um conflito silencioso que fazia o login falhar sem erros visíveis.
+
+### Correção Aplicada:
+
+Removido o `PrismaAdapter`:
+```typescript
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  session: { strategy: "jwt" }, // ✅ Apenas JWT, sem adapter
+  providers: [Credentials({...})]
+})
+```
 
 ### O que foi feito:
 
-1. ✅ Verificado que as migrations estavam aplicadas
-2. ✅ Executado o seed para criar usuário de teste
-3. ✅ Usuário criado com sucesso
+1. ✅ Removido PrismaAdapter incompatível
+2. ✅ Verificado que o banco tem usuários
+3. ✅ Testado credenciais localmente (funcionando)
+4. ✅ Deploy feito com correção
 
 ### Credenciais de Teste:
 
@@ -17,13 +41,45 @@ Email: teste@lembretes.app
 Senha: 123456
 ```
 
-Agora você pode fazer login em: https://lembretesmyklan.vercel.app/login
+Aguarde o deploy da Vercel terminar (~2-3 minutos) e tente fazer login em: https://lembretesmyklan.vercel.app/login
+
+---
+
+## 📚 Por que isso aconteceu?
+
+### Contexto Técnico:
+
+No **NextAuth v5**, existem duas estratégias de sessão:
+
+1. **Database Session** (`strategy: "database"`)
+   - Requer um adapter (PrismaAdapter, DrizzleAdapter, etc.)
+   - Sessões armazenadas no banco de dados
+   - Funciona com OAuth providers (Google, GitHub, etc.)
+
+2. **JWT Session** (`strategy: "jwt"`)
+   - Não usa adapter
+   - Sessões armazenadas em tokens JWT
+   - **Obrigatório** para Credentials provider
+
+### O Problema:
+
+O código estava misturando as duas estratégias:
+```typescript
+adapter: PrismaAdapter(prisma),  // ← Para database strategy
+session: { strategy: "jwt" },     // ← Para JWT strategy
+providers: [Credentials({...})]   // ← Requer JWT strategy
+```
+
+Isso criava um conflito onde o NextAuth tentava usar o adapter para validar credenciais, mas a sessão era JWT, causando falhas silenciosas.
+
+### Referências:
+
+- [NextAuth v5 Docs - Session Strategy](https://authjs.dev/concepts/session-strategies)
+- [NextAuth v5 Docs - Credentials Provider](https://authjs.dev/getting-started/providers/credentials)
 
 ---
 
 ## 🔧 Configuração de Variáveis de Ambiente (Referência)
-
-### 1. Acesse as Configurações do Projeto na Vercel
 
 1. Entre em [vercel.com](https://vercel.com)
 2. Selecione seu projeto **lembretesmyklan**
