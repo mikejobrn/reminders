@@ -21,18 +21,13 @@ export default function LoginFormClient({ action }: LoginFormClientProps) {
 
         const formData = new FormData(e.currentTarget);
         
-        try {
-            const result = await action(formData);
-            
-            if (result?.error) {
-                setError(result.error);
-                setLoading(false);
-            }
-            // Se não houver erro, o redirect acontece automaticamente
-        } catch (err) {
-            // Não fazemos nada - deixamos o Next.js lidar com o redirect
-            // O erro NEXT_REDIRECT é normal e esperado
+        const result = await action(formData);
+        
+        if (result?.error) {
+            setError(result.error);
+            setLoading(false);
         }
+        // Se não houver erro, o redirect acontece automaticamente via server action
     };
 
     return (
