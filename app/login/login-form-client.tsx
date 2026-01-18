@@ -31,8 +31,7 @@ export default function LoginFormClient({ action }: LoginFormClientProps) {
             // Se não houver erro, o redirect acontece automaticamente
         } catch (err) {
             // Não fazemos nada - deixamos o Next.js lidar com o redirect
-            // O erro de redirect é normal e esperado
-            console.log("[CLIENT] Action threw (probably redirect):", err);
+            // O erro NEXT_REDIRECT é normal e esperado
         }
     };
 
