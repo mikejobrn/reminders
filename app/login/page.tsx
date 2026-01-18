@@ -1,5 +1,6 @@
 import { signIn } from "@/lib/auth";
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import LoginFormClient from "./login-form-client";
 
 async function handleLogin(formData: FormData) {
@@ -9,23 +10,34 @@ async function handleLogin(formData: FormData) {
   console.log("[SERVER] Email:", formData.get("email"));
   
   try {
-    console.log("[SERVER] Calling signIn...");
-    await signIn("credentials", formData);
-    console.log("[SERVER] signIn completed (this shouldn't log - redirect should happen)");
+    console.log("[SERVER] Calling signIn with redirect: false...");
+    const result = await signIn("credentials", {
+      email: formData.get("email"),
+      password: formData.get("password"),
+      redirect: false,
+    });
+    
+    console.log("[SERVER] signIn result:", result);
+    
+    if (result?.error) {
+      console.log("[SERVER] Auth failed");
+      return { error: "Email ou senha inválidos" };
+    }
+    
+    console.log("[SERVER] Auth success, redirecting to /lists");
   } catch (error) {
     console.error("[SERVER] Caught error:", error);
-    console.error("[SERVER] Error type:", error?.constructor?.name);
     
     if (error instanceof AuthError) {
       console.log("[SERVER] Returning auth error");
       return { error: "Email ou senha inválidos" };
     }
     
-    console.log("[SERVER] Re-throwing error for Next.js");
     throw error;
   }
   
-  console.log("[SERVER] End of function (shouldn't reach here)");
+  // Redirect manual após sucesso
+  redirect("/lists");
 }
 
 export default function LoginPage() {
