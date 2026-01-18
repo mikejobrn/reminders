@@ -79,6 +79,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     // }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      console.log("[AUTH] Redirect callback", { url, baseUrl });
+      
+      // Se a URL é relativa, retorna ela
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      
+      // Se a URL começa com baseUrl, retorna ela
+      if (url.startsWith(baseUrl)) return url;
+      
+      // Caso contrário, retorna baseUrl
+      return baseUrl;
+    },
     async jwt({ token, user }) {
       console.log("[AUTH] JWT callback", { hasUser: !!user, tokenId: token.id });
       if (user) {
