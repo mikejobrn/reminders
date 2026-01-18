@@ -16,16 +16,22 @@ export default function LoginFormClient({ action }: LoginFormClientProps) {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        console.log("[CLIENT] Form submit started");
         setError("");
         setLoading(true);
 
         const formData = new FormData(e.currentTarget);
+        console.log("[CLIENT] FormData created, calling action...");
         
         const result = await action(formData);
+        console.log("[CLIENT] Action returned:", result);
         
         if (result?.error) {
+            console.log("[CLIENT] Error received:", result.error);
             setError(result.error);
             setLoading(false);
+        } else {
+            console.log("[CLIENT] No error, waiting for redirect...");
         }
         // Se não houver erro, o redirect acontece automaticamente via server action
     };
