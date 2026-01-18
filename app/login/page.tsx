@@ -6,33 +6,19 @@ import LoginFormClient from "./login-form-client";
 async function handleLogin(formData: FormData) {
   "use server";
 
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-
-  console.log("[LOGIN] Server action called", { email });
+  console.log("[LOGIN] Server action called");
 
   try {
-    await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-
-    console.log("[LOGIN] Sign in successful");
+    await signIn("credentials", formData);
   } catch (error) {
     console.error("[LOGIN] Sign in error:", error);
-
+    
     if (error instanceof AuthError) {
       return { error: "Email ou senha inválidos" };
     }
+    // Re-throw para o Next.js lidar com REDIRECT_ERROR
     throw error;
   }
-
-  // Se chegou aqui, login foi bem sucedido
-  redirect("/lists");
-}
-
-export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-(--color-ios-gray-6) dark:bg-black px-4">
       <div className="w-full max-w-md">
