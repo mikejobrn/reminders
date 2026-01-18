@@ -1,17 +1,11 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-// import Google from "next-auth/providers/google";
-// import Apple from "next-auth/providers/apple";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { authConfig } from "./auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  trustHost: true, // Necessário para NextAuth v5 em produção
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-    newUser: "/register",
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: "Credentials",
@@ -66,44 +60,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
-
-    // TODO: Adicionar depois que configurar OAuth apps
-    // Google({
-    //   clientId: process.env.GOOGLE_CLIENT_ID!,
-    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    // }),
-
-    // Apple({
-    //   clientId: process.env.APPLE_CLIENT_ID!,
-    //   clientSecret: process.env.APPLE_CLIENT_SECRET!,
-    // }),
   ],
-  callbacks: {
-    async redirect({ url, baseUrl }) {
-      console.log("[AUTH] Redirect callback", { url, baseUrl });
-      
-      // Se a URL é relativa, retorna ela
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      
-      // Se a URL começa com baseUrl, retorna ela
-      if (url.startsWith(baseUrl)) return url;
-      
-      // Caso contrário, retorna baseUrl
-      return baseUrl;
-    },
-    async jwt({ token, user }) {
-      console.log("[AUTH] JWT callback", { hasUser: !!user, tokenId: token.id });
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      console.log("[AUTH] Session callback", { tokenId: token.id });
-      if (session.user) {
-        session.user.id = token.id as string;
-      }
-      return session;
-    },
-  },
 });

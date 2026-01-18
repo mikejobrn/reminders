@@ -22,10 +22,10 @@ export default function LoginFormClient({ action }: LoginFormClientProps) {
 
         const formData = new FormData(e.currentTarget);
         console.log("[CLIENT] FormData created, calling action...");
-        
+
         const result = await action(formData);
         console.log("[CLIENT] Action returned:", result);
-        
+
         if (result?.error) {
             console.log("[CLIENT] Error received:", result.error);
             setError(result.error);

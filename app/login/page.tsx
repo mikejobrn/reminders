@@ -7,7 +7,7 @@ async function handleLogin(formData: FormData) {
 
   console.log("[SERVER] Login action called");
   console.log("[SERVER] Email:", formData.get("email"));
-  
+
   try {
     console.log("[SERVER] Calling signIn with redirectTo...");
     await signIn("credentials", {
@@ -19,12 +19,12 @@ async function handleLogin(formData: FormData) {
   } catch (error) {
     console.error("[SERVER] Caught error:", error);
     console.error("[SERVER] Error type:", error?.constructor?.name);
-    
+
     if (error instanceof AuthError) {
       console.log("[SERVER] Returning auth error");
       return { error: "Email ou senha inválidos" };
     }
-    
+
     // NextAuth lança NEXT_REDIRECT para navegação
     throw error;
   }
