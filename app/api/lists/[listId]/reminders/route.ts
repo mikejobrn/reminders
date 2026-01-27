@@ -11,7 +11,14 @@ const createReminderSchema = z.object({
   listId: z.string().min(1, "ID da lista inválido"),
   sectionId: z.string().min(1).optional(),
   parentId: z.string().min(1).optional(), // Para subtarefas
-  priority: z.number().int().min(0).max(3).default(0),
+  priority: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return 0;
+      const num = Number(val);
+      return isNaN(num) ? 0 : num;
+    },
+    z.number().int().min(0).max(3).default(0)
+  ),
   flagged: z.boolean().default(false),
   
   // Data e timezone
@@ -30,7 +37,14 @@ const createReminderSchema = z.object({
   // Tags
   tagIds: z.array(z.string().min(1)).optional(),
   
-  sortOrder: z.number().optional(),
+  sortOrder: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().optional()
+  ),
 });
 
 // Schema de validação para atualização

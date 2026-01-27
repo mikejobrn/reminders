@@ -298,8 +298,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
                       setShowPriorityPicker(false);
                     }}
                     className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${priority === index
-                        ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white"
-                        : "bg-white dark:bg-(--color-ios-dark-gray-6) text-black dark:text-white hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5)"
+                      ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white"
+                      : "bg-white dark:bg-(--color-ios-dark-gray-6) text-black dark:text-white hover:bg-(--color-ios-gray-5) dark:hover:bg-(--color-ios-dark-gray-5)"
                       }`}
                   >
                     <span className="text-[17px]">{label}</span>
@@ -333,8 +333,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
               </div>
               <div
                 className={`w-12 h-7 rounded-full transition-colors ${flagged
-                    ? "bg-(--color-ios-orange) dark:bg-(--color-ios-dark-orange)"
-                    : "bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-4)"
+                  ? "bg-(--color-ios-orange) dark:bg-(--color-ios-dark-orange)"
+                  : "bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-4)"
                   }`}
               >
                 <div
@@ -390,8 +390,8 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
                         )
                       }
                       className={`px-3 py-1 rounded-full text-[14px] border transition-colors ${selected
-                          ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white border-transparent"
-                          : "bg-white dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-4) hover:border-(--color-ios-blue)"
+                        ? "bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white border-transparent"
+                        : "bg-white dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-4) hover:border-(--color-ios-blue)"
                         }`}
                     >
                       #{tag.name}

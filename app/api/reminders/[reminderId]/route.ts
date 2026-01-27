@@ -10,7 +10,14 @@ const updateReminderSchema = z.object({
   notes: z.string().optional(),
   sectionId: z.string().min(1).optional().nullable(),
   parentId: z.string().min(1).optional().nullable(),
-  priority: z.number().int().min(0).max(3).optional(),
+  priority: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().int().min(0).max(3).optional()
+  ),
   flagged: z.boolean().optional(),
   completed: z.boolean().optional(),
   
@@ -30,7 +37,14 @@ const updateReminderSchema = z.object({
   // Tags
   tagIds: z.array(z.string().min(1)).optional(),
   
-  sortOrder: z.number().optional(),
+  sortOrder: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().optional()
+  ),
 });
 
 const priorityFromNumber = (value: number) => {
