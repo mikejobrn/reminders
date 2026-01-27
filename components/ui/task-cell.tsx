@@ -81,8 +81,9 @@ export function TaskCell({
 
   const handleCellClick = (e: React.MouseEvent) => {
     if (!canEdit) return;
-    // if clicked inside input, let input's mouseUp handler provide caret
-    if (e.target === inputRef.current) return;
+    // ignore clicks in action buttons; input will stop propagation itself
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return;
     onClick?.(id, e, undefined);
   };
 
@@ -134,7 +135,8 @@ export function TaskCell({
             onChange={(e) => onEditChange?.(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             onMouseUp={(e) => {
-              if (!isEditing) {
+              e.stopPropagation();
+              if (!isEditing && canEdit) {
                 const pos = inputRef.current?.selectionStart ?? undefined;
                 onClick?.(id, e as React.MouseEvent, pos);
               }

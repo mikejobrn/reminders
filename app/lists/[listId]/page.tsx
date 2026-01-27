@@ -1,45 +1,31 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { IoChevronBack, IoAdd, IoEllipsisHorizontal } from "react-icons/io5";
+import { AnimatePresence, motion } from "framer-motion";
 import { TaskCell } from "@/components/ui/task-cell";
 import { ReminderModal, ReminderData } from "@/components/ui/reminder-modal";
+import { SwipeableTaskCell } from "@/components/ui/swipeable-task-cell";
+import { UndoToast, UndoToastItem } from "@/components/ui/undo-toast";
 
-interface Reminder {
-  id: string;
-  title: string;
-  notes?: string;
-  completed: boolean;
-  priority: number;
-  flagged: boolean;
-  utcDatetime?: string;
-  timezone?: string;
-  isFloating: boolean;
-  isDateOnly: boolean;
-  tags: Array<{
-    tag: {
-      id: string;
-      name: string;
-      color: string;
-    };
-  }>;
-  _count: {
-    children: number;
-    attachments: number;
-  };
+type CompletedPosition = "MOVE_TO_BOTTOM" | "KEEP_IN_PLACE";
+type CompletedVisibility = "SHOW" | "SHOW_TODAY_ONLY" | "HIDE";
+
+interface UserPreferences {
+  completedPosition: CompletedPosition;
+  completedVisibility: CompletedVisibility;
+  undoTimeoutSeconds: number;
+  confirmBeforeDelete: boolean;
 }
 
-interface List {
-  id: string;
-  name: string;
-  color?: string;
-  icon?: string;
-  incompleteCount: number;
-  isOwner?: boolean;
-  role?: "viewer" | "editor" | "admin";
-}
+const DEFAULT_PREFERENCES: UserPreferences = {
+  completedPosition: "MOVE_TO_BOTTOM",
+  completedVisibility: "SHOW_TODAY_ONLY",
+  undoTimeoutSeconds: 5,
+  confirmBeforeDelete: true,
+};
 
 const SMART_LISTS: Record<string, { name: string; color: string; icon: string; allowCreate: boolean; includeCompleted?: boolean }> = {
   today: { name: "Hoje", color: "#007AFF", icon: "calendar-outline", allowCreate: false },
@@ -49,7 +35,6 @@ const SMART_LISTS: Record<string, { name: string; color: string; icon: string; a
   completed: { name: "Concluídos", color: "#8E8E93", icon: "checkmark-circle-outline", allowCreate: false, includeCompleted: true },
 };
 
-// Skeleton Components
 function SkeletonTaskCell() {
   return (
     <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl animate-pulse">
@@ -81,7 +66,41 @@ function SkeletonLoader() {
   );
 }
 
-// API Functions
+interface Reminder {
+  id: string;
+  title: string;
+  notes?: string;
+  completed: boolean;
+  completedAt?: string | null;
+  priority: number;
+  flagged: boolean;
+  utcDatetime?: string;
+  timezone?: string;
+  isFloating: boolean;
+  isDateOnly: boolean;
+  tags: Array<{
+    tag: {
+      id: string;
+      name: string;
+      color: string;
+    };
+  }>;
+  _count: {
+    children: number;
+    attachments: number;
+  };
+}
+
+interface List {
+  id: string;
+  name: string;
+  color?: string;
+  icon?: string;
+  incompleteCount: number;
+  isOwner?: boolean;
+  role?: "viewer" | "editor" | "admin";
+}
+
 async function fetchList(listId: string): Promise<List> {
   const smart = SMART_LISTS[listId];
   if (smart) {
@@ -101,12 +120,12 @@ async function fetchList(listId: string): Promise<List> {
   return response.json();
 }
 
-async function fetchReminders(listId: string): Promise<Reminder[]> {
+async function fetchReminders(listId: string, includeCompleted: boolean): Promise<Reminder[]> {
   const smart = SMART_LISTS[listId];
   if (smart) {
     const query = new URLSearchParams();
     query.set("parentId", "null");
-    if (smart.includeCompleted) query.set("includeCompleted", "true");
+    if (smart.includeCompleted || includeCompleted) query.set("includeCompleted", "true");
     const response = await fetch(`/api/smart-lists/${listId}/reminders?${query.toString()}`);
     if (response.status === 401 || response.status === 403) {
       throw new Error("Unauthorized");
@@ -117,13 +136,40 @@ async function fetchReminders(listId: string): Promise<Reminder[]> {
     return response.json();
   }
 
-  const response = await fetch(`/api/lists/${listId}/reminders?parentId=null`);
+  const response = await fetch(`/api/lists/${listId}/reminders?parentId=null${includeCompleted ? "&includeCompleted=true" : ""}`);
   if (response.status === 401 || response.status === 403) {
     throw new Error("Unauthorized");
   }
   if (!response.ok) {
     throw new Error("Erro ao carregar lembretes");
   }
+  return response.json();
+}
+
+async function fetchPreferences(): Promise<UserPreferences> {
+  const response = await fetch(`/api/user/preferences`);
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Unauthorized");
+  }
+  if (!response.ok) {
+    throw new Error("Erro ao carregar preferências");
+  }
+  return response.json();
+}
+
+async function deleteReminder(reminderId: string): Promise<{ message: string }> {
+  const response = await fetch(`/api/reminders/${reminderId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Erro ao deletar lembrete");
+  return response.json();
+}
+
+async function restoreReminder(reminderId: string): Promise<Reminder> {
+  const response = await fetch(`/api/reminders/${reminderId}/restore`, {
+    method: "PATCH",
+  });
+  if (!response.ok) throw new Error("Erro ao restaurar lembrete");
   return response.json();
 }
 
@@ -180,10 +226,20 @@ export default function ListDetailPage({
   const [editingReminder, setEditingReminder] = useState<Reminder | undefined>(undefined);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState<string>("");
+  const [editingCaretPos, setEditingCaretPos] = useState<number | null>(null);
   const [creatingNewId, setCreatingNewId] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState<string>("");
+  const [pendingUndo, setPendingUndo] = useState<{
+    id: string;
+    type: "complete" | "delete";
+    reminderId: string;
+    previousCompleted?: boolean;
+  } | null>(null);
+  const [toastItem, setToastItem] = useState<UndoToastItem | null>(null);
 
   const newItemInputRef = React.useRef<HTMLInputElement | null>(null);
+  const lastVisibleDayRef = React.useRef<number>(new Date().getDate());
+  const actionIdCounter = useRef(0);
 
   // Queries
   const { data: list, isLoading: listLoading, error: listError } = useQuery({
@@ -198,9 +254,10 @@ export default function ListDetailPage({
     },
   });
 
-  const { data: reminders = [], isLoading: remindersLoading, error: remindersError } = useQuery({
-    queryKey: ["reminders", listId],
-    queryFn: () => fetchReminders(listId),
+  const { data: preferencesData } = useQuery({
+    queryKey: ["preferences"],
+    queryFn: fetchPreferences,
+    staleTime: Infinity,
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message === "Unauthorized") {
         return false;
@@ -209,15 +266,45 @@ export default function ListDetailPage({
     },
   });
 
+  const preferences = preferencesData ?? DEFAULT_PREFERENCES;
+
+  const includeCompleted = preferences.completedVisibility !== "HIDE";
+  const remindersQueryKey = ["reminders", listId, includeCompleted] as const;
+
+  const { data: reminders = [], isLoading: remindersLoading, error: remindersError } = useQuery({
+    queryKey: remindersQueryKey,
+    queryFn: () => fetchReminders(listId, includeCompleted),
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) return;
+      const today = new Date().getDate();
+      if (today !== lastVisibleDayRef.current) {
+        lastVisibleDayRef.current = today;
+        queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [listId, queryClient]);
+
   // Mutations
   const saveReminderMutation = useMutation({
     mutationFn: (data: ReminderData) => saveReminder(editingReminder?.id, data, listId),
     onMutate: async (data) => {
       // Optimistic update
-      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
+      const previousReminders = queryClient.getQueryData<Reminder[]>(remindersQueryKey) ?? [];
 
       if (editingReminder) {
-        queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+        queryClient.setQueryData(remindersQueryKey, previousReminders.map((r) =>
           r.id === editingReminder.id
             ? {
               ...r,
@@ -244,7 +331,7 @@ export default function ListDetailPage({
           tags: [],
           _count: { children: 0, attachments: 0 },
         };
-        queryClient.setQueryData(["reminders", listId], [...previousReminders, optimisticReminder]);
+        queryClient.setQueryData(remindersQueryKey, [...previousReminders, optimisticReminder]);
       }
 
       return previousReminders;
@@ -256,7 +343,7 @@ export default function ListDetailPage({
     },
     onError: (error, _, previousReminders) => {
       if (previousReminders) {
-        queryClient.setQueryData(["reminders", listId], previousReminders);
+        queryClient.setQueryData(remindersQueryKey, previousReminders);
       }
       alert(error instanceof Error ? error.message : "Erro ao salvar lembrete");
     },
@@ -277,15 +364,15 @@ export default function ListDetailPage({
     mutationFn: ({ reminderId, completed }: { reminderId: string; completed: boolean }) =>
       toggleReminder(reminderId, completed),
     onMutate: ({ reminderId, completed }) => {
-      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
-      queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+      const previousReminders = queryClient.getQueryData<Reminder[]>(remindersQueryKey) ?? [];
+      queryClient.setQueryData(remindersQueryKey, previousReminders.map((r) =>
         r.id === reminderId ? { ...r, completed } : r
       ));
       return previousReminders;
     },
     onError: (error, _, previousReminders) => {
       if (previousReminders) {
-        queryClient.setQueryData(["reminders", listId], previousReminders);
+        queryClient.setQueryData(remindersQueryKey, previousReminders);
       }
       alert(error instanceof Error ? error.message : "Erro ao atualizar lembrete");
     },
@@ -295,8 +382,8 @@ export default function ListDetailPage({
     mutationFn: ({ reminderId, title }: { reminderId: string; title: string }) =>
       updateReminderTitle(reminderId, title),
     onMutate: ({ reminderId, title }) => {
-      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
-      queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+      const previousReminders = queryClient.getQueryData<Reminder[]>(remindersQueryKey) ?? [];
+      queryClient.setQueryData(remindersQueryKey, previousReminders.map((r) =>
         r.id === reminderId ? { ...r, title } : r
       ));
       return previousReminders;
@@ -304,12 +391,14 @@ export default function ListDetailPage({
     onSuccess: () => {
       setEditingTitleId(null);
       setEditingTitleValue("");
+      setEditingCaretPos(null);
     },
     onError: (error, _, previousReminders) => {
       if (previousReminders) {
-        queryClient.setQueryData(["reminders", listId], previousReminders);
+        queryClient.setQueryData(remindersQueryKey, previousReminders);
       }
       setEditingTitleId(null);
+      setEditingCaretPos(null);
       alert(error instanceof Error ? error.message : "Erro ao atualizar lembrete");
     },
   });
@@ -326,18 +415,52 @@ export default function ListDetailPage({
     },
   });
 
+  const deleteReminderMutation = useMutation({
+    mutationFn: (reminderId: string) => deleteReminder(reminderId),
+    onMutate: async (reminderId) => {
+      const previousReminders = queryClient.getQueryData<Reminder[]>(remindersQueryKey) ?? [];
+      queryClient.setQueryData(
+        remindersQueryKey,
+        previousReminders.filter((r) => r.id !== reminderId)
+      );
+      return { previousReminders };
+    },
+    onError: (error, _, context) => {
+      if (context?.previousReminders) {
+        queryClient.setQueryData(remindersQueryKey, context.previousReminders);
+      }
+      alert(error instanceof Error ? error.message : "Erro ao deletar lembrete");
+    },
+  });
+
+  const restoreReminderMutation = useMutation({
+    mutationFn: (reminderId: string) => restoreReminder(reminderId),
+    onSuccess: (restored) => {
+      const previousReminders = queryClient.getQueryData<Reminder[]>(remindersQueryKey) ?? [];
+      const exists = previousReminders.some((r) => r.id === restored.id);
+      if (!exists) {
+        queryClient.setQueryData(remindersQueryKey, [restored, ...previousReminders]);
+      }
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : "Erro ao restaurar lembrete");
+    },
+  });
+
   const canCreateInThisView = !SMART_LISTS[listId];
   const canEditInThisView = !SMART_LISTS[listId] && (list?.role ?? "admin") !== "viewer";
 
-  const beginInlineEdit = (reminder: Reminder) => {
+  const beginInlineEdit = (reminder: Reminder, caretPos: number | null = null) => {
     if (!canEditInThisView) return;
     setEditingTitleId(reminder.id);
     setEditingTitleValue(reminder.title);
+    setEditingCaretPos(caretPos);
   };
 
   const cancelInlineEdit = () => {
     setEditingTitleId(null);
     setEditingTitleValue("");
+    setEditingCaretPos(null);
   };
 
   const saveInlineTitle = (reminderId: string) => {
@@ -355,11 +478,6 @@ export default function ListDetailPage({
       return;
     }
 
-    if (nextTitle === reminder.title) {
-      cancelInlineEdit();
-      return;
-    }
-
     handleUpdateTitle({ reminderId, title: nextTitle });
   };
 
@@ -370,7 +488,6 @@ export default function ListDetailPage({
       cancelNewItem();
       return;
     }
-
     handleCreateReminder({ title, listId });
   };
 
@@ -382,10 +499,109 @@ export default function ListDetailPage({
   const startCreatingAfter = (reminderId: string | null) => {
     if (!canEditInThisView) return;
     cancelInlineEdit();
-    setCreatingNewId(reminderId ?? 'bottom');
+    setCreatingNewId(reminderId ?? "bottom");
     setNewItemTitle("");
     setTimeout(() => newItemInputRef.current?.focus(), 10);
   };
+
+  const nextActionId = (type: string, reminderId: string) => {
+    actionIdCounter.current += 1;
+    return `${type}-${reminderId}-${actionIdCounter.current}`;
+  };
+
+  const queueUndo = (payload: {
+    id: string;
+    type: "complete" | "delete";
+    reminderId: string;
+    previousCompleted?: boolean;
+  }) => {
+    setPendingUndo(payload);
+    setToastItem({
+      id: payload.id,
+      message:
+        payload.type === "delete"
+          ? "Lembrete excluído"
+          : payload.previousCompleted
+            ? "Tarefa reaberta"
+            : "Tarefa concluída",
+      timeoutMs: preferences.undoTimeoutSeconds * 1000,
+    });
+  };
+
+  const toggleWithUndo = (reminder: Reminder, completed: boolean) => {
+    handleToggleReminder({ reminderId: reminder.id, completed });
+    const actionId = nextActionId("complete", reminder.id);
+    queueUndo({ id: actionId, type: "complete", reminderId: reminder.id, previousCompleted: reminder.completed });
+  };
+
+  const deleteWithUndo = (reminder: Reminder) => {
+    deleteReminderMutation.mutate(reminder.id);
+    const actionId = nextActionId("delete", reminder.id);
+    queueUndo({ id: actionId, type: "delete", reminderId: reminder.id });
+  };
+
+  const handleUndo = (id: string) => {
+    if (!pendingUndo || pendingUndo.id !== id) return;
+    if (pendingUndo.type === "complete") {
+      handleToggleReminder({ reminderId: pendingUndo.reminderId, completed: pendingUndo.previousCompleted ?? false });
+    } else {
+      restoreReminderMutation.mutate(pendingUndo.reminderId);
+    }
+    setPendingUndo(null);
+    setToastItem(null);
+  };
+
+  const handleUndoTimeout = (id: string) => {
+    if (pendingUndo?.id === id) {
+      setPendingUndo(null);
+    }
+    setToastItem(null);
+  };
+
+  const isTodayLocal = (dateString?: string | null) => {
+    if (!dateString) return false;
+    const d = new Date(dateString);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+
+  const visibleCompleted = useMemo(() => {
+    if (preferences.completedVisibility === "HIDE") return [] as Reminder[];
+    const completedList = reminders.filter((r) => r.completed);
+    if (preferences.completedVisibility === "SHOW_TODAY_ONLY") {
+      return completedList.filter((r) => isTodayLocal(r.completedAt ?? undefined));
+    }
+    return completedList;
+  }, [reminders, preferences.completedVisibility]);
+
+  const visibleIncomplete = useMemo(() => reminders.filter((r) => !r.completed), [reminders]);
+
+  const orderedReminders = useMemo(() => {
+    if (preferences.completedVisibility === "HIDE") {
+      return visibleIncomplete;
+    }
+
+    if (preferences.completedPosition === "KEEP_IN_PLACE") {
+      const allowedIds = new Set<string>([
+        ...visibleIncomplete.map((r) => r.id),
+        ...visibleCompleted.map((r) => r.id),
+      ]);
+      return reminders.filter((r) => allowedIds.has(r.id));
+    }
+
+    return [...visibleIncomplete, ...visibleCompleted];
+  }, [preferences.completedPosition, preferences.completedVisibility, reminders, visibleCompleted, visibleIncomplete]);
+
+  const completedTodayCount = useMemo(
+    () => reminders.filter((r) => r.completed && isTodayLocal(r.completedAt ?? undefined)).length,
+    [reminders]
+  );
+
+  const firstCompletedIndex = useMemo(() => orderedReminders.findIndex((r) => r.completed), [orderedReminders]);
 
   if (listError || remindersError) {
     const error = listError || remindersError;
@@ -418,7 +634,10 @@ export default function ListDetailPage({
                 <IoChevronBack size={24} />
                 <span>Listas</span>
               </button>
-              <button className="p-2 hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) rounded-full transition-colors">
+              <button
+                onClick={() => router.push("/settings")}
+                className="p-2 hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) rounded-full transition-colors"
+              >
                 <IoEllipsisHorizontal size={24} className="text-black dark:text-white" />
               </button>
             </div>
@@ -431,9 +650,6 @@ export default function ListDetailPage({
       </div>
     );
   }
-
-  const incompleteTasks = reminders.filter((r) => !r.completed);
-  const completedTasks = reminders.filter((r) => r.completed);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black pb-24 flex flex-col">
@@ -448,7 +664,10 @@ export default function ListDetailPage({
               <IoChevronBack size={24} />
               <span>Listas</span>
             </button>
-            <button className="p-2 hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) rounded-full transition-colors">
+            <button
+              onClick={() => router.push("/settings")}
+              className="p-2 hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) rounded-full transition-colors"
+            >
               <IoEllipsisHorizontal size={24} className="text-black dark:text-white" />
             </button>
           </div>
@@ -458,7 +677,7 @@ export default function ListDetailPage({
                 {list.name}
               </h1>
               <p className="text-[17px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
-                {incompleteTasks.length} {incompleteTasks.length === 1 ? "tarefa" : "tarefas"}
+                {visibleIncomplete.length} {visibleIncomplete.length === 1 ? "tarefa" : "tarefas"}
               </p>
             </div>
             <div className="h-12" />
@@ -470,14 +689,14 @@ export default function ListDetailPage({
       <div className="max-w-3xl px-4 py-6 flex flex-col flex-1">
         {remindersLoading ? (
           <SkeletonLoader />
-        ) : reminders.length === 0 && creatingNewId !== 'bottom' ? (
+        ) : orderedReminders.length === 0 && creatingNewId !== 'bottom' ? (
           <div className="text-center py-16 text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
             <p>Nenhum lembrete</p>
             <p className="text-sm mt-2">
               {SMART_LISTS[listId] ? "Nada para mostrar aqui" : "Clique abaixo para adicionar"}
             </p>
           </div>
-        ) : reminders.length === 0 && creatingNewId === 'bottom' ? (
+        ) : orderedReminders.length === 0 && creatingNewId === 'bottom' ? (
           <div className="space-y-2">
             <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl">
               <div className="flex-shrink-0 w-6 h-6" />
@@ -504,66 +723,98 @@ export default function ListDetailPage({
           </div>
         ) : (
           <>
-            {/* Tarefas Incompletas */}
-            {incompleteTasks.length > 0 && (
+            {orderedReminders.length > 0 && (
               <div className="space-y-2 mb-6">
-                {incompleteTasks.map((reminder) => {
-                  const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
-                  return (
-                    <React.Fragment key={reminder.id}>
-                      <TaskCell
-                        id={reminder.id}
-                        completed={reminder.completed}
-                        title={reminder.title}
-                        notes={reminder.notes}
-                        dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
-                        priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                        tags={reminder.tags.map((t) => t.tag.name)}
-                        subtaskCount={reminder._count.children}
-                        onToggle={(id) => handleToggleReminder({ reminderId: id, completed: true })}
-                        canEdit={canEditInThisView && editingTitleId !== reminder.id}
-                        isEditing={editingTitleId === reminder.id}
-                        editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
-                        onEditChange={setEditingTitleValue}
-                        onEditCancel={cancelInlineEdit}
-                        onEditSubmit={() => saveInlineTitle(reminder.id)}
-                        onClick={(id) => beginInlineEdit(reminder)}
-                        initialCaretPos={null}
-                        onEnterPress={(id) => startCreatingAfter(id)}
-                        onInfoClick={() => {
-                          if (!canEditInThisView) return;
-                          setEditingReminder(reminder);
-                          setShowReminderModal(true);
-                        }}
-                      />
-                      {creatingNewId === reminder.id && (
-                        <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
-                          <div className="flex-shrink-0 w-6 h-6" />
-                          <input
-                            ref={newItemInputRef}
-                            value={newItemTitle}
-                            onChange={(e) => setNewItemTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                createNewItemInline();
-                              }
-                              if (e.key === "Escape") {
-                                e.preventDefault();
-                                cancelNewItem();
-                              }
+                <AnimatePresence initial={false}>
+                  {orderedReminders.map((reminder, index) => {
+                    const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
+                    const isFirstCompleted = reminder.completed && firstCompletedIndex === index && preferences.completedVisibility !== "HIDE";
+
+                    return (
+                      <motion.div
+                        key={reminder.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ type: "spring", stiffness: 360, damping: 32 }}
+                      >
+                        {isFirstCompleted && (
+                          <div className="flex items-center justify-between mt-4 px-2">
+                            <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
+                              Concluídas ({orderedReminders.length - firstCompletedIndex})
+                            </h2>
+                            {completedTodayCount > 0 && (
+                              <span className="text-[13px] font-semibold px-3 py-1 rounded-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)">
+                                {completedTodayCount} hoje 🎉
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <SwipeableTaskCell
+                          onComplete={canEditInThisView ? () => toggleWithUndo(reminder, true) : undefined}
+                          onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
+                          confirmBeforeDelete={preferences.confirmBeforeDelete}
+                          completed={reminder.completed}
+                        >
+                          <TaskCell
+                            id={reminder.id}
+                            completed={reminder.completed}
+                            title={reminder.title}
+                            notes={reminder.notes}
+                            dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
+                            priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
+                            tags={reminder.tags.map((t) => t.tag.name)}
+                            subtaskCount={reminder._count.children}
+                            onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
+                            canEdit={canEditInThisView}
+                            isEditing={editingTitleId === reminder.id}
+                            editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                            onEditChange={setEditingTitleValue}
+                            onEditCancel={cancelInlineEdit}
+                            onEditSubmit={() => saveInlineTitle(reminder.id)}
+                            onClick={(id, _e, caretPos) => beginInlineEdit(reminder, caretPos ?? null)}
+                            initialCaretPos={editingTitleId === reminder.id ? editingCaretPos : null}
+                            onEnterPress={(id) => startCreatingAfter(id)}
+                            onInfoClick={() => {
+                              if (!canEditInThisView) return;
+                              setEditingReminder(reminder);
+                              setShowReminderModal(true);
                             }}
-                            onBlur={() => createNewItemInline()}
-                            placeholder="Novo lembrete"
-                            className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
-                            aria-label="Novo lembrete"
                           />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-                {creatingNewId === 'bottom' && incompleteTasks.length > 0 && (
+                        </SwipeableTaskCell>
+
+                        {creatingNewId === reminder.id && (
+                          <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
+                            <div className="flex-shrink-0 w-6 h-6" />
+                            <input
+                              ref={newItemInputRef}
+                              value={newItemTitle}
+                              onChange={(e) => setNewItemTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  createNewItemInline();
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  cancelNewItem();
+                                }
+                              }}
+                              onBlur={() => createNewItemInline()}
+                              placeholder="Novo lembrete"
+                              className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
+                              aria-label="Novo lembrete"
+                            />
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+
+                {creatingNewId === 'bottom' && orderedReminders.length > 0 && (
                   <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
                     <div className="flex-shrink-0 w-6 h-6" />
                     <input
@@ -589,53 +840,11 @@ export default function ListDetailPage({
                 )}
               </div>
             )}
-
-            {/* Tarefas Concluídas */}
-            {completedTasks.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1) mb-3 px-2">
-                  Concluídas ({completedTasks.length})
-                </h2>
-                <div className="space-y-2">
-                  {completedTasks.map((reminder) => {
-                    const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
-                    return (
-                      <TaskCell
-                        key={reminder.id}
-                        id={reminder.id}
-                        completed={reminder.completed}
-                        title={reminder.title}
-                        notes={reminder.notes}
-                        dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
-                        priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                        tags={reminder.tags.map((t) => t.tag.name)}
-                        subtaskCount={reminder._count.children}
-                        onToggle={(id) => handleToggleReminder({ reminderId: id, completed: false })}
-                        canEdit={canEditInThisView && editingTitleId !== reminder.id}
-                        isEditing={editingTitleId === reminder.id}
-                        editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
-                        onEditChange={setEditingTitleValue}
-                        onEditCancel={cancelInlineEdit}
-                        onEditSubmit={() => saveInlineTitle(reminder.id)}
-                        onClick={(id) => beginInlineEdit(reminder)}
-                        initialCaretPos={null}
-                        onEnterPress={(id) => startCreatingAfter(id)}
-                        onInfoClick={() => {
-                          if (!canEditInThisView) return;
-                          setEditingReminder(reminder);
-                          setShowReminderModal(true);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
 
         {/* Área clicável no final para criar novo lembrete */}
-        {!SMART_LISTS[listId] && canEditInThisView && creatingNewId === null && reminders.length > 0 && (
+        {!SMART_LISTS[listId] && canEditInThisView && creatingNewId === null && orderedReminders.length > 0 && (
           <div
             className="flex-1 min-h-[120px] cursor-pointer hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) transition-colors"
             onClick={() => startCreatingAfter(null)}
@@ -651,6 +860,8 @@ export default function ListDetailPage({
           />
         )}
       </div>
+
+      <UndoToast item={toastItem} onUndo={handleUndo} onTimeout={handleUndoTimeout} />
 
       {/* FAB + */}
       {!SMART_LISTS[listId] && canEditInThisView && (

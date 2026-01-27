@@ -27,6 +27,20 @@ async function main() {
     name: user.name,
   });
 
+  await prisma.userPreferences.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: {
+      userId: user.id,
+      completedPosition: "MOVE_TO_BOTTOM",
+      completedVisibility: "SHOW_TODAY_ONLY",
+      undoTimeoutSeconds: 5,
+      confirmBeforeDelete: true,
+    },
+  });
+
+  console.log("✅ Preferências padrão criadas para o usuário de teste");
+
   const lists = await prisma.list.createMany({
     data: [
       {

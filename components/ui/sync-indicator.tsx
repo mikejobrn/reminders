@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { IoWifi, IoWifiOutline, IoCheckmark } from 'react-icons/io5';
 
 export function SyncIndicator() {
-    const [status, setStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
-    const [isMounted, setIsMounted] = useState(false);
+    const [status, setStatus] = useState<'synced' | 'syncing' | 'offline'>(() => {
+        if (typeof navigator === 'undefined') return 'synced';
+        return navigator.onLine ? 'synced' : 'offline';
+    });
 
     useEffect(() => {
-        setIsMounted(true);
         const handleOnline = () => {
             setStatus('synced');
         };
@@ -20,17 +21,11 @@ export function SyncIndicator() {
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
 
-        if (!navigator.onLine) {
-            setStatus('offline');
-        }
-
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
     }, []);
-
-    if (!isMounted) return null;
 
     const getIcon = () => {
         switch (status) {

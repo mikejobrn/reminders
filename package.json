@@ -30,6 +30,7 @@
     "bcryptjs": "^3.0.3",
     "dexie": "^4.2.1",
     "dnd-kit": "^0.0.2",
+    "framer-motion": "^11.0.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.1",
     "luxon": "^3.7.2",

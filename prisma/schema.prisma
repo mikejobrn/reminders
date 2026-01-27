@@ -52,8 +52,23 @@ model User {
   assignedReminders Reminder[]  @relation("AssignedTo")
   sessions          Session[]
   tags              Tag[]
+  preferences       UserPreferences?
 
   @@map("users")
+}
+
+model UserPreferences {
+  id                   String               @id @default(cuid())
+  userId               String               @unique @map("user_id")
+  completedPosition    CompletedPosition    @default(MOVE_TO_BOTTOM) @map("completed_position")
+  completedVisibility  CompletedVisibility  @default(SHOW_TODAY_ONLY) @map("completed_visibility")
+  undoTimeoutSeconds   Int                  @default(5) @map("undo_timeout_seconds")
+  confirmBeforeDelete  Boolean              @default(true) @map("confirm_before_delete")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 model VerificationToken {
@@ -236,4 +251,15 @@ enum Priority {
   LOW
   MEDIUM
   HIGH
+}
+
+enum CompletedPosition {
+  MOVE_TO_BOTTOM
+  KEEP_IN_PLACE
+}
+
+enum CompletedVisibility {
+  SHOW_TODAY_ONLY
+  HIDE
+  SHOW_ALL
 }
