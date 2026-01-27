@@ -215,18 +215,18 @@ export default function ListDetailPage({
     onMutate: async (data) => {
       // Optimistic update
       const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
-      
+
       if (editingReminder) {
         queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
-          r.id === editingReminder.id 
-            ? { 
-                ...r, 
-                title: data.title,
-                notes: data.notes,
-                priority: data.priority ?? r.priority,
-                utcDatetime: data.dueDate,
-                timezone: data.timezone,
-              } 
+          r.id === editingReminder.id
+            ? {
+              ...r,
+              title: data.title,
+              notes: data.notes,
+              priority: data.priority ?? r.priority,
+              utcDatetime: data.dueDate,
+              timezone: data.timezone,
+            }
             : r
         ));
       } else {
