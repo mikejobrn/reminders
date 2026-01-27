@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { IoChevronBack, IoAdd, IoEllipsisHorizontal } from "react-icons/io5";
 import { TaskCell } from "@/components/ui/task-cell";
 import { ReminderModal, ReminderData } from "@/components/ui/reminder-modal";
@@ -48,169 +49,282 @@ const SMART_LISTS: Record<string, { name: string; color: string; icon: string; a
   completed: { name: "Concluídos", color: "#8E8E93", icon: "checkmark-circle-outline", allowCreate: false, includeCompleted: true },
 };
 
+// Skeleton Components
+function SkeletonTaskCell() {
+  return (
+    <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl animate-pulse">
+      <div className="flex-shrink-0 w-6 h-6 bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-5) rounded" />
+      <div className="flex-1 space-y-2">
+        <div className="h-4 bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-5) rounded w-3/4" />
+        <div className="h-3 bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-5) rounded w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonListHeader() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-8 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded w-1/3 mb-3" />
+      <div className="h-5 bg-(--color-ios-gray-5) dark:bg-(--color-ios-dark-gray-5) rounded w-1/4" />
+    </div>
+  );
+}
+
+function SkeletonLoader() {
+  return (
+    <div className="space-y-2 mb-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <SkeletonTaskCell key={i} />
+      ))}
+    </div>
+  );
+}
+
+// API Functions
+async function fetchList(listId: string): Promise<List> {
+  const smart = SMART_LISTS[listId];
+  if (smart) {
+    return { id: listId, name: smart.name, color: smart.color, icon: smart.icon, incompleteCount: 0, role: "viewer" };
+  }
+
+  const response = await fetch(`/api/lists/${listId}`);
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Unauthorized");
+  }
+  if (response.status === 404) {
+    throw new Error("Lista não encontrada");
+  }
+  if (!response.ok) {
+    throw new Error("Erro ao carregar lista");
+  }
+  return response.json();
+}
+
+async function fetchReminders(listId: string): Promise<Reminder[]> {
+  const smart = SMART_LISTS[listId];
+  if (smart) {
+    const query = new URLSearchParams();
+    query.set("parentId", "null");
+    if (smart.includeCompleted) query.set("includeCompleted", "true");
+    const response = await fetch(`/api/smart-lists/${listId}/reminders?${query.toString()}`);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Unauthorized");
+    }
+    if (!response.ok) {
+      throw new Error("Erro ao carregar lembretes");
+    }
+    return response.json();
+  }
+
+  const response = await fetch(`/api/lists/${listId}/reminders?parentId=null`);
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("Unauthorized");
+  }
+  if (!response.ok) {
+    throw new Error("Erro ao carregar lembretes");
+  }
+  return response.json();
+}
+
+async function saveReminder(reminderId: string | undefined, data: ReminderData, listId: string): Promise<Reminder> {
+  if (reminderId) {
+    const response = await fetch(`/api/reminders/${reminderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Erro ao atualizar lembrete");
+    return response.json();
+  } else {
+    const response = await fetch(`/api/lists/${listId}/reminders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Erro ao criar lembrete");
+    return response.json();
+  }
+}
+
+async function toggleReminder(reminderId: string, completed: boolean): Promise<Reminder> {
+  const response = await fetch(`/api/reminders/${reminderId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ completed }),
+  });
+  if (!response.ok) throw new Error("Erro ao atualizar lembrete");
+  return response.json();
+}
+
+async function updateReminderTitle(reminderId: string, title: string): Promise<Reminder> {
+  const response = await fetch(`/api/reminders/${reminderId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) throw new Error("Erro ao atualizar lembrete");
+  return response.json();
+}
+
 export default function ListDetailPage({
   params,
 }: {
   params: Promise<{ listId: string }>;
 }) {
-  // Resolver params (Next.js 16)
   const { listId } = React.use(params);
-  
-  const [list, setList] = useState<List | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | undefined>(undefined);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState<string>("");
-  const [savingTitleId, setSavingTitleId] = useState<string | null>(null);
-  const [creatingNewId, setCreatingNewId] = useState<string | null>(null); // null ou 'bottom' ou ID do reminder
+  const [creatingNewId, setCreatingNewId] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState<string>("");
-  const router = useRouter();
 
   const newItemInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const fetchListAndReminders = React.useCallback(async () => {
-    try {
-      setLoading(true);
-
-      const smart = SMART_LISTS[listId];
-      if (smart) {
-        setList({ id: listId, name: smart.name, color: smart.color, icon: smart.icon, incompleteCount: 0, role: "viewer" });
-
-        const query = new URLSearchParams();
-        query.set("parentId", "null");
-        if (smart.includeCompleted) query.set("includeCompleted", "true");
-
-        const remindersResponse = await fetch(`/api/smart-lists/${listId}/reminders?${query.toString()}`);
-        if (remindersResponse.status === 401) {
-          router.replace(`/login?callbackUrl=${encodeURIComponent(`/lists/${listId}`)}`);
-          return;
-        }
-        if (!remindersResponse.ok) throw new Error("Erro ao carregar lembretes");
-
-        const remindersData = await remindersResponse.json();
-        setReminders(remindersData);
-        return;
-      }
-      
-      // Carregar lista
-      const listResponse = await fetch(`/api/lists/${listId}`);
-      if (listResponse.status === 401) {
+  // Queries
+  const { data: list, isLoading: listLoading, error: listError } = useQuery({
+    queryKey: ["list", listId],
+    queryFn: () => fetchList(listId),
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "Unauthorized") {
         router.replace(`/login?callbackUrl=${encodeURIComponent(`/lists/${listId}`)}`);
-        return;
+        return false;
       }
-      if (listResponse.status === 403) {
-        throw new Error("Sem permissão para acessar esta lista");
+      return failureCount < 3;
+    },
+  });
+
+  const { data: reminders = [], isLoading: remindersLoading, error: remindersError } = useQuery({
+    queryKey: ["reminders", listId],
+    queryFn: () => fetchReminders(listId),
+    retry: (failureCount, error) => {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        return false;
       }
-      if (listResponse.status === 404) {
-        throw new Error("Lista não encontrada");
-      }
-      if (!listResponse.ok) throw new Error("Erro ao carregar lista");
-      const listData = await listResponse.json();
-      setList(listData);
+      return failureCount < 3;
+    },
+  });
+
+  // Mutations
+  const saveReminderMutation = useMutation({
+    mutationFn: (data: ReminderData) => saveReminder(editingReminder?.id, data, listId),
+    onMutate: async (data) => {
+      // Optimistic update
+      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
       
-      // Carregar lembretes
-      const remindersResponse = await fetch(
-        `/api/lists/${listId}/reminders?parentId=null`
-      );
-      if (remindersResponse.status === 401) {
-        router.replace(`/login?callbackUrl=${encodeURIComponent(`/lists/${listId}`)}`);
-        return;
-      }
-      if (remindersResponse.status === 403) {
-        throw new Error("Sem permissão para acessar os lembretes desta lista");
-      }
-      if (remindersResponse.status === 404) {
-        throw new Error("Lista não encontrada");
-      }
-      if (!remindersResponse.ok) throw new Error("Erro ao carregar lembretes");
-      const remindersData = await remindersResponse.json();
-      setReminders(remindersData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
-    } finally {
-      setLoading(false);
-    }
-  }, [listId, router]);
-
-  // Carregar lista e lembretes
-  useEffect(() => {
-    fetchListAndReminders();
-  }, [fetchListAndReminders]);
-
-  // Salvar lembrete (novo ou edição)
-  const handleSaveReminder = async (data: ReminderData) => {
-    try {
       if (editingReminder) {
-        // Editar
-        const response = await fetch(`/api/reminders/${editingReminder.id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        });
-        
-        if (!response.ok) throw new Error("Erro ao atualizar lembrete");
-        
-        const updatedReminder = await response.json();
-        setReminders(
-          reminders.map((r) =>
-            r.id === editingReminder.id ? updatedReminder : r
-          )
-        );
+        queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+          r.id === editingReminder.id 
+            ? { 
+                ...r, 
+                title: data.title,
+                notes: data.notes,
+                priority: data.priority ?? r.priority,
+                utcDatetime: data.dueDate,
+                timezone: data.timezone,
+              } 
+            : r
+        ));
       } else {
-        // Criar
-        const response = await fetch(`/api/lists/${listId}/reminders`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        });
-        
-        if (!response.ok) throw new Error("Erro ao criar lembrete");
-        
-        const newReminder = await response.json();
-        setReminders([...reminders, newReminder]);
+        const optimisticReminder: Reminder = {
+          id: "temp-" + Date.now(),
+          title: data.title,
+          notes: data.notes,
+          completed: false,
+          priority: data.priority ?? 0,
+          flagged: data.flagged ?? false,
+          utcDatetime: data.dueDate,
+          timezone: data.timezone,
+          isFloating: false,
+          isDateOnly: false,
+          tags: [],
+          _count: { children: 0, attachments: 0 },
+        };
+        queryClient.setQueryData(["reminders", listId], [...previousReminders, optimisticReminder]);
       }
-      
+
+      return previousReminders;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
       setShowReminderModal(false);
       setEditingReminder(undefined);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao salvar lembrete");
-    }
+    },
+    onError: (error, _, previousReminders) => {
+      if (previousReminders) {
+        queryClient.setQueryData(["reminders", listId], previousReminders);
+      }
+      alert(error instanceof Error ? error.message : "Erro ao salvar lembrete");
+    },
+  });
+
+  const handleSaveReminder = async (data: ReminderData) => {
+    return new Promise<void>((resolve, reject) => {
+      saveReminderMutation.mutate(data, {
+        onSuccess: () => resolve(),
+        onError: (error) => {
+          reject(error);
+        },
+      });
+    });
   };
 
-  // Alternar conclusão do lembrete
-  const handleToggleReminder = async (reminderId: string, completed: boolean) => {
-    try {
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          completed: completed,
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error("Erro ao atualizar lembrete");
+  const { mutate: handleToggleReminder } = useMutation({
+    mutationFn: ({ reminderId, completed }: { reminderId: string; completed: boolean }) =>
+      toggleReminder(reminderId, completed),
+    onMutate: ({ reminderId, completed }) => {
+      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
+      queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+        r.id === reminderId ? { ...r, completed } : r
+      ));
+      return previousReminders;
+    },
+    onError: (error, _, previousReminders) => {
+      if (previousReminders) {
+        queryClient.setQueryData(["reminders", listId], previousReminders);
       }
-      
-      // Atualizar localmente
-      setReminders(
-        reminders.map((r) =>
-          r.id === reminderId ? { ...r, completed: completed } : r
-        )
-      );
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao atualizar lembrete");
-    }
-  };
+      alert(error instanceof Error ? error.message : "Erro ao atualizar lembrete");
+    },
+  });
+
+  const { mutate: handleUpdateTitle } = useMutation({
+    mutationFn: ({ reminderId, title }: { reminderId: string; title: string }) =>
+      updateReminderTitle(reminderId, title),
+    onMutate: ({ reminderId, title }) => {
+      const previousReminders = queryClient.getQueryData<Reminder[]>(["reminders", listId]) ?? [];
+      queryClient.setQueryData(["reminders", listId], previousReminders.map((r) =>
+        r.id === reminderId ? { ...r, title } : r
+      ));
+      return previousReminders;
+    },
+    onSuccess: () => {
+      setEditingTitleId(null);
+      setEditingTitleValue("");
+    },
+    onError: (error, _, previousReminders) => {
+      if (previousReminders) {
+        queryClient.setQueryData(["reminders", listId], previousReminders);
+      }
+      setEditingTitleId(null);
+      alert(error instanceof Error ? error.message : "Erro ao atualizar lembrete");
+    },
+  });
+
+  const { mutate: handleCreateReminder } = useMutation({
+    mutationFn: (data: ReminderData) => saveReminder(undefined, data, listId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
+      setCreatingNewId(null);
+      setNewItemTitle("");
+    },
+    onError: (error) => {
+      alert(error instanceof Error ? error.message : "Erro ao criar lembrete");
+    },
+  });
 
   const canCreateInThisView = !SMART_LISTS[listId];
   const canEditInThisView = !SMART_LISTS[listId] && (list?.role ?? "admin") !== "viewer";
@@ -221,37 +335,12 @@ export default function ListDetailPage({
     setEditingTitleValue(reminder.title);
   };
 
-  const beginInlineEditWithCaret = (reminder: Reminder, caretPos?: number) => {
-    if (!canEditInThisView) return;
-    setEditingTitleId(reminder.id);
-    setEditingTitleValue(reminder.title);
-    // store caret position in a temporary prop by embedding in reminder object? store separately
-    setTimeout(() => {
-      // no-op: caret will be passed via TaskCell prop from parent state below
-    }, 0);
-    // we set a per-id caret mapping
-    setInitialCaretForId((prev) => ({ ...prev, [reminder.id]: typeof caretPos === 'number' ? caretPos : null }));
-  };
-
-  const [initialCaretForId, setInitialCaretForId] = useState<Record<string, number | null>>({});
-
-  const consumeInitialCaret = (id: string) => {
-    const v = initialCaretForId[id] ?? null;
-    // remove after consuming
-    setInitialCaretForId((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    return v;
-  };
-
   const cancelInlineEdit = () => {
     setEditingTitleId(null);
     setEditingTitleValue("");
   };
 
-  const saveInlineTitle = async (reminderId: string) => {
+  const saveInlineTitle = (reminderId: string) => {
     if (!canEditInThisView) return;
 
     const reminder = reminders.find((r) => r.id === reminderId);
@@ -262,7 +351,6 @@ export default function ListDetailPage({
 
     const nextTitle = editingTitleValue.trim();
     if (!nextTitle) {
-      // Não permite título vazio; reverte.
       cancelInlineEdit();
       return;
     }
@@ -272,41 +360,7 @@ export default function ListDetailPage({
       return;
     }
 
-    setSavingTitleId(reminderId);
-    try {
-      // Otimista
-      setReminders((prev) =>
-        prev.map((r) => (r.id === reminderId ? { ...r, title: nextTitle } : r))
-      );
-
-      const response = await fetch(`/api/reminders/${reminderId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: nextTitle,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao atualizar lembrete");
-      }
-
-      const updatedReminder = await response.json();
-      setReminders((prev) =>
-        prev.map((r) => (r.id === reminderId ? updatedReminder : r))
-      );
-    } catch (err) {
-      // Reverte (melhor do que deixar inconsistente)
-      setReminders((prev) =>
-        prev.map((r) => (r.id === reminderId ? { ...r, title: reminder.title } : r))
-      );
-      alert(err instanceof Error ? err.message : "Erro ao atualizar lembrete");
-    } finally {
-      setSavingTitleId(null);
-      cancelInlineEdit();
-    }
+    handleUpdateTitle({ reminderId, title: nextTitle });
   };
 
   const createNewItemInline = async () => {
@@ -317,42 +371,7 @@ export default function ListDetailPage({
       return;
     }
 
-    try {
-      const response = await fetch(`/api/lists/${listId}/reminders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title,
-          listId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Erro ao criar lembrete");
-      }
-
-      const newReminder = await response.json();
-      // Inserir após o item especificado ou no final
-      if (creatingNewId && creatingNewId !== 'bottom') {
-        const idx = reminders.findIndex((r) => r.id === creatingNewId);
-        if (idx >= 0) {
-          const newList = [...reminders];
-          newList.splice(idx + 1, 0, newReminder);
-          setReminders(newList);
-        } else {
-          setReminders((prev) => [...prev, newReminder]);
-        }
-      } else {
-        setReminders((prev) => [...prev, newReminder]);
-      }
-      setNewItemTitle("");
-      setCreatingNewId(null);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao criar lembrete");
-      cancelNewItem();
-    }
+    handleCreateReminder({ title, listId });
   };
 
   const cancelNewItem = () => {
@@ -368,28 +387,46 @@ export default function ListDetailPage({
     setTimeout(() => newItemInputRef.current?.focus(), 10);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <div className="text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
-          Carregando...
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !list) {
+  if (listError || remindersError) {
+    const error = listError || remindersError;
     return (
       <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
         <div className="text-(--color-ios-red) p-4 text-center">
           <p className="font-semibold mb-2">Não foi possível abrir a lista</p>
-          <p className="text-sm">{error}</p>
+          <p className="text-sm">{error instanceof Error ? error.message : "Erro desconhecido"}</p>
           <button
             onClick={() => router.push("/lists")}
             className="mt-4 px-4 py-2 bg-(--color-ios-blue) dark:bg-(--color-ios-dark-blue) text-white rounded-lg"
           >
             Voltar para Listas
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (listLoading || !list) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-black pb-24 flex flex-col">
+        <div className="sticky top-0 z-10 bg-white dark:bg-black border-b border-(--color-ios-gray-6) dark:border-(--color-ios-dark-gray-6)">
+          <div className="max-w-3xl px-4 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => router.push("/lists")}
+                className="flex items-center gap-2 text-(--color-ios-blue) dark:text-(--color-ios-dark-blue) hover:opacity-70 transition-opacity"
+              >
+                <IoChevronBack size={24} />
+                <span>Listas</span>
+              </button>
+              <button className="p-2 hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-6) rounded-full transition-colors">
+                <IoEllipsisHorizontal size={24} className="text-black dark:text-white" />
+              </button>
+            </div>
+            <SkeletonListHeader />
+          </div>
+        </div>
+        <div className="max-w-3xl px-4 py-6">
+          <SkeletonLoader />
         </div>
       </div>
     );
@@ -431,7 +468,9 @@ export default function ListDetailPage({
 
       {/* Content */}
       <div className="max-w-3xl px-4 py-6 flex flex-col flex-1">
-        {reminders.length === 0 && creatingNewId !== 'bottom' ? (
+        {remindersLoading ? (
+          <SkeletonLoader />
+        ) : reminders.length === 0 && creatingNewId !== 'bottom' ? (
           <div className="text-center py-16 text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
             <p>Nenhum lembrete</p>
             <p className="text-sm mt-2">
@@ -468,61 +507,62 @@ export default function ListDetailPage({
             {/* Tarefas Incompletas */}
             {incompleteTasks.length > 0 && (
               <div className="space-y-2 mb-6">
-                {incompleteTasks.map((reminder, idx) => {
+                {incompleteTasks.map((reminder) => {
                   const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
                   return (
-                  <React.Fragment key={reminder.id}>
-                  <TaskCell
-                    id={reminder.id}
-                    completed={reminder.completed}
-                    title={reminder.title}
-                    notes={reminder.notes}
-                    dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
-                    priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                    tags={reminder.tags.map((t) => t.tag.name)}
-                    subtaskCount={reminder._count.children}
-                    onToggle={(id) => handleToggleReminder(id, true)}
-                    canEdit={canEditInThisView && savingTitleId !== reminder.id}
-                    isEditing={editingTitleId === reminder.id}
-                    editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
-                    onEditChange={setEditingTitleValue}
-                    onEditCancel={cancelInlineEdit}
-                    onEditSubmit={() => saveInlineTitle(reminder.id)}
-                    onClick={(id, e, caret) => beginInlineEditWithCaret(reminder, caret)}
-                    initialCaretPos={initialCaretForId[reminder.id] ?? null}
-                    onEnterPress={(id) => startCreatingAfter(id)}
-                    onInfoClick={() => {
-                      if (!canEditInThisView) return;
-                      setEditingReminder(reminder);
-                      setShowReminderModal(true);
-                    }}
-                  />
-                  {creatingNewId === reminder.id && (
-                    <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
-                      <div className="flex-shrink-0 w-6 h-6" />
-                      <input
-                        ref={newItemInputRef}
-                        value={newItemTitle}
-                        onChange={(e) => setNewItemTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            createNewItemInline();
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            cancelNewItem();
-                          }
+                    <React.Fragment key={reminder.id}>
+                      <TaskCell
+                        id={reminder.id}
+                        completed={reminder.completed}
+                        title={reminder.title}
+                        notes={reminder.notes}
+                        dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
+                        priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
+                        tags={reminder.tags.map((t) => t.tag.name)}
+                        subtaskCount={reminder._count.children}
+                        onToggle={(id) => handleToggleReminder({ reminderId: id, completed: true })}
+                        canEdit={canEditInThisView && editingTitleId !== reminder.id}
+                        isEditing={editingTitleId === reminder.id}
+                        editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                        onEditChange={setEditingTitleValue}
+                        onEditCancel={cancelInlineEdit}
+                        onEditSubmit={() => saveInlineTitle(reminder.id)}
+                        onClick={(id) => beginInlineEdit(reminder)}
+                        initialCaretPos={null}
+                        onEnterPress={(id) => startCreatingAfter(id)}
+                        onInfoClick={() => {
+                          if (!canEditInThisView) return;
+                          setEditingReminder(reminder);
+                          setShowReminderModal(true);
                         }}
-                        onBlur={() => createNewItemInline()}
-                        placeholder="Novo lembrete"
-                        className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
-                        aria-label="Novo lembrete"
                       />
-                    </div>
-                  )}
-                  </React.Fragment>
-                );})}
+                      {creatingNewId === reminder.id && (
+                        <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
+                          <div className="flex-shrink-0 w-6 h-6" />
+                          <input
+                            ref={newItemInputRef}
+                            value={newItemTitle}
+                            onChange={(e) => setNewItemTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                createNewItemInline();
+                              }
+                              if (e.key === "Escape") {
+                                e.preventDefault();
+                                cancelNewItem();
+                              }
+                            }}
+                            onBlur={() => createNewItemInline()}
+                            placeholder="Novo lembrete"
+                            className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
+                            aria-label="Novo lembrete"
+                          />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
                 {creatingNewId === 'bottom' && incompleteTasks.length > 0 && (
                   <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
                     <div className="flex-shrink-0 w-6 h-6" />
@@ -560,33 +600,34 @@ export default function ListDetailPage({
                   {completedTasks.map((reminder) => {
                     const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
                     return (
-                    <TaskCell
-                      key={reminder.id}
-                      id={reminder.id}
-                      completed={reminder.completed}
-                      title={reminder.title}
-                      notes={reminder.notes}
-                      dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
-                      priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                      tags={reminder.tags.map((t) => t.tag.name)}
-                      subtaskCount={reminder._count.children}
-                      onToggle={(id) => handleToggleReminder(id, false)}
-                      canEdit={canEditInThisView && savingTitleId !== reminder.id}
-                      isEditing={editingTitleId === reminder.id}
-                      editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
-                      onEditChange={setEditingTitleValue}
-                      onEditCancel={cancelInlineEdit}
-                      onEditSubmit={() => saveInlineTitle(reminder.id)}
-                      onClick={(id, e, caret) => beginInlineEditWithCaret(reminder, caret)}
-                      initialCaretPos={initialCaretForId[reminder.id] ?? null}
-                      onEnterPress={(id) => startCreatingAfter(id)}
-                      onInfoClick={() => {
-                        if (!canEditInThisView) return;
-                        setEditingReminder(reminder);
-                        setShowReminderModal(true);
-                      }}
-                    />
-                  );})}
+                      <TaskCell
+                        key={reminder.id}
+                        id={reminder.id}
+                        completed={reminder.completed}
+                        title={reminder.title}
+                        notes={reminder.notes}
+                        dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
+                        priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
+                        tags={reminder.tags.map((t) => t.tag.name)}
+                        subtaskCount={reminder._count.children}
+                        onToggle={(id) => handleToggleReminder({ reminderId: id, completed: false })}
+                        canEdit={canEditInThisView && editingTitleId !== reminder.id}
+                        isEditing={editingTitleId === reminder.id}
+                        editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                        onEditChange={setEditingTitleValue}
+                        onEditCancel={cancelInlineEdit}
+                        onEditSubmit={() => saveInlineTitle(reminder.id)}
+                        onClick={(id) => beginInlineEdit(reminder)}
+                        initialCaretPos={null}
+                        onEnterPress={(id) => startCreatingAfter(id)}
+                        onInfoClick={() => {
+                          if (!canEditInThisView) return;
+                          setEditingReminder(reminder);
+                          setShowReminderModal(true);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}

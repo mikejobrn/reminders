@@ -3,6 +3,7 @@ import "./globals.css";
 import "./fonts.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "Lembretes",
@@ -43,7 +44,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Providers>
+            {children}
+          </Providers>
           <PWAInstallPrompt />
         </ThemeProvider>
       </body>
