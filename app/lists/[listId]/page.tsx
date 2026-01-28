@@ -529,7 +529,7 @@ export default function ListDetailPage({
           : payload.previousCompleted
             ? "Tarefa reaberta"
             : "Tarefa concluída",
-      timeoutMs: preferences.undoTimeoutSeconds * 1000,
+      timeoutMs: Math.min(preferences.undoTimeoutSeconds * 1000, 3000),
     });
   };
 
@@ -758,7 +758,7 @@ export default function ListDetailPage({
                         )}
 
                         <SwipeableTaskCell
-                          onComplete={canEditInThisView ? () => toggleWithUndo(reminder, !reminder.completed) : undefined}
+                          onCreateSubtask={canEditInThisView ? () => startCreatingAfter(reminder.id) : undefined}
                           onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
                           confirmBeforeDelete={preferences.confirmBeforeDelete}
                           completed={reminder.completed}
@@ -771,7 +771,7 @@ export default function ListDetailPage({
                             dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
                             priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
                             flagged={reminder.flagged}
-                            tags={reminder.tags.map((t) => t.tag.color)}
+                            tags={reminder.tags.map((t) => t.tag)}
                             subtaskCount={reminder._count.children}
                             onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
                             canEdit={canEditInThisView}

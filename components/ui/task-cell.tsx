@@ -15,7 +15,7 @@ interface TaskCellProps {
   flagged?: boolean;
   dueDate?: Date | string;
   color?: string;
-  tags?: string[];
+  tags?: Array<{ id: string; name: string; color: string }>;
   subtaskCount?: number;
   onToggle?: (id: string) => void;
   // onClick: id, optional mouse event, optional caret position when clicking inside title
@@ -65,15 +65,21 @@ export function TaskCell({
     if (!isEditing) return;
     const el = inputRef.current;
     if (!el) return;
-    el.focus();
-    const val = el.value ?? "";
-    if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
-      const pos = Math.min(initialCaretPos, val.length);
-      el.setSelectionRange(pos, pos);
-    } else {
-      const len = val.length;
-      el.setSelectionRange(len, len);
-    }
+    
+    const timeout = setTimeout(() => {
+      el.focus();
+      el.click();
+      const val = el.value ?? "";
+      if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
+        const pos = Math.min(initialCaretPos, val.length);
+        el.setSelectionRange(pos, pos);
+      } else {
+        const len = val.length;
+        el.setSelectionRange(len, len);
+      }
+    }, 50);
+
+    return () => clearTimeout(timeout);
   }, [isEditing, initialCaretPos]);
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -168,7 +174,7 @@ export function TaskCell({
               `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1 ` +
               (completed
                 ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-                : "text-black dark:text-white")
+                : "te8t-black dark:text-white")
             }
             aria-label="Título da tarefa"
           />
@@ -199,26 +205,14 @@ export function TaskCell({
 
           {tags && tags.length > 0 && (
             <div className="flex gap-1.5 items-center">
-              {tags.map((tag) => {
-                const colorMap: Record<string, string> = {
-                  blue: "#007AFF",
-                  red: "#FF3B30",
-                  orange: "#FF9500",
-                  yellow: "#FFCC00",
-                  green: "#34C759",
-                  teal: "#5AC8FA",
-                  purple: "#AF52DE",
-                  pink: "#FF2D55",
-                };
-                return (
-                  <div
-                    key={tag}
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: colorMap[tag] || "#8E8E93" }}
-                    title={tag}
-                  />
-                );
-              })}
+              {tags.map((tag) => (
+                <div
+                  key={tag.id}
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: tag.color || "#8E8E93" }}
+                  title={tag.name}
+                />
+              ))}
             </div>
           )}
 

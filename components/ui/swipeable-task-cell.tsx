@@ -2,11 +2,11 @@
 
 import React from "react";
 import { motion, useAnimationControls } from "framer-motion";
-import { IoCheckmark, IoTrash, IoArrowUndo } from "react-icons/io5";
+import { IoGitMerge, IoTrash, IoArrowUndo } from "react-icons/io5";
 
 interface SwipeableTaskCellProps {
     children: React.ReactNode;
-    onComplete?: () => void;
+    onCreateSubtask?: () => void;
     onDelete?: () => void;
     confirmBeforeDelete?: boolean;
     completed?: boolean;
@@ -27,21 +27,21 @@ const haptic = (pattern: number | number[] = 50) => {
 
 export function SwipeableTaskCell({
     children,
-    onComplete,
+    onCreateSubtask,
     onDelete,
     confirmBeforeDelete = true,
     completed = false,
 }: SwipeableTaskCellProps) {
     const controls = useAnimationControls();
-    const [actionArmed, setActionArmed] = React.useState<"complete" | "delete" | null>(null);
+    const [actionArmed, setActionArmed] = React.useState<"createSubtask" | "delete" | null>(null);
 
     const resetPosition = () =>
         controls.start({ x: 0, transition: { type: "spring", stiffness: 320, damping: 28 } });
 
     const handleDrag = (_: any, info: { offset: { x: number } }) => {
         const { x } = info.offset;
-        if (x > COMPLETE_THRESHOLD && actionArmed !== "complete") {
-            setActionArmed("complete");
+        if (x > COMPLETE_THRESHOLD && actionArmed !== "createSubtask") {
+            setActionArmed("createSubtask");
             haptic();
         } else if (x < DELETE_THRESHOLD && actionArmed !== "delete") {
             setActionArmed("delete");
@@ -54,9 +54,9 @@ export function SwipeableTaskCell({
     const handleDragEnd = async (_: any, info: { offset: { x: number } }) => {
         const { x } = info.offset;
 
-        if (x > COMPLETE_THRESHOLD && onComplete) {
+        if (x > COMPLETE_THRESHOLD && onCreateSubtask) {
             haptic(30);
-            onComplete();
+            onCreateSubtask();
             await resetPosition();
             return;
         }
@@ -77,9 +77,9 @@ export function SwipeableTaskCell({
     return (
         <div className="relative">
             <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none select-none">
-                <div className="flex items-center text-(--color-ios-green) gap-2 opacity-80">
-                    {completed ? <IoArrowUndo size={20} /> : <IoCheckmark size={20} />}
-                    <span className="text-sm font-medium">{completed ? "Reabrir" : "Concluir"}</span>
+                <div className="flex items-center text-(--color-ios-blue) gap-2 opacity-80">
+                    <IoGitMerge size={20} />
+                    <span className="text-sm font-medium">Criar Subtarefa</span>
                 </div>
                 <div className="flex items-center text-(--color-ios-red) gap-2 opacity-80">
                     <span className="text-sm font-medium">Apagar</span>
