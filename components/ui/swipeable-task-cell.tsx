@@ -82,7 +82,7 @@ export function SwipeableTaskCell({
             >
                 <div className={`flex flex-col items-center gap-1 ${actionArmed === "createSubtask" ? "text-white" : "text-white dark:text-black"}`}>
                     <IoGitMerge size={24} />
-                    {actionArmed === "createSubtask" && <span className="text-[12px] font-bold">Subtarefa</span>}
+                    <span className="text-[12px] font-bold">Subtarefa</span>
                 </div>
             </div>
 
@@ -90,7 +90,7 @@ export function SwipeableTaskCell({
             <div className="absolute inset-y-0 right-0 w-1/2 bg-(--color-ios-red) flex items-center justify-end px-6">
                 <div className="flex flex-col items-center gap-1 text-white">
                     <IoTrash size={24} />
-                    {actionArmed === "delete" && <span className="text-[12px] font-bold">Apagar</span>}
+                    <span className="text-[12px] font-bold">Apagar</span>
                 </div>
             </div>
 

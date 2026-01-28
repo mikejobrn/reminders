@@ -9,6 +9,28 @@ import { TaskCell } from "@/components/ui/task-cell";
 import { ReminderModal, ReminderData } from "@/components/ui/reminder-modal";
 import { SwipeableTaskCell } from "@/components/ui/swipeable-task-cell";
 import { UndoToast, UndoToastItem } from "@/components/ui/undo-toast";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  DragStartEvent,
+  DragEndEvent,
+  TouchSensor,
+  MeasuringStrategy
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type CompletedPosition = "MOVE_TO_BOTTOM" | "KEEP_IN_PLACE";
 type CompletedVisibility = "SHOW" | "SHOW_TODAY_ONLY" | "HIDE";
@@ -237,6 +259,32 @@ async function updateReminderTitle(reminderId: string, title: string): Promise<R
   return response.json();
 }
 
+function SortableTaskItem({ id, children }: { id: string; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+    zIndex: isDragging ? 999 : "auto",
+    position: "relative" as const,
+    touchAction: "none",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
+
 export default function ListDetailPage({
   params,
 }: {
@@ -254,6 +302,9 @@ export default function ListDetailPage({
   const [creatingNewId, setCreatingNewId] = useState<string | null>(null);
   const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState<string>("");
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
   const [pendingUndo, setPendingUndo] = useState<{
     id: string;
     type: "complete" | "delete";
@@ -265,6 +316,48 @@ export default function ListDetailPage({
   const newItemInputRef = React.useRef<HTMLInputElement | null>(null);
   const lastVisibleDayRef = React.useRef<number>(new Date().getDate());
   const actionIdCounter = useRef(0);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const toggleCollapse = (id: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+
+    if (active.id !== over?.id) {
+       // Ideally implement reordering logic here
+       // For now just console log as backend reordering requires more setup
+       console.log("Reordered", active.id, over?.id);
+    }
+  };
 
   // Queries
   const { data: list, isLoading: listLoading, error: listError } = useQuery({
@@ -789,160 +882,185 @@ export default function ListDetailPage({
         ) : (
           <>
             {orderedReminders.length > 0 && (
-              <div className="flex flex-col mb-6 bg-white dark:bg-(--color-ios-dark-gray-6) rounded-xl overflow-hidden shadow-sm">
-                <AnimatePresence initial={false}>
-                  {orderedReminders.map((reminder, index) => {
-                    const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
-                    const isFirstCompleted = reminder.completed && firstCompletedIndex === index && preferences.completedVisibility !== "HIDE";
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                measuring={{
+                  droppable: {
+                    strategy: MeasuringStrategy.Always,
+                  }
+                }}
+              >
+                <div className="flex flex-col mb-6 bg-white dark:bg-(--color-ios-dark-gray-6) rounded-xl overflow-hidden shadow-sm">
+                  <SortableContext items={orderedReminders.map(r => r.id)} strategy={verticalListSortingStrategy}>
+                    {orderedReminders.map((reminder, index) => {
+                      const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
+                      const isFirstCompleted = reminder.completed && firstCompletedIndex === index && preferences.completedVisibility !== "HIDE";
 
-                    return (
-                      <motion.div
-                        key={reminder.id}
-                        layout
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={{ type: "spring", stiffness: 360, damping: 32 }}
-                      >
-                        {isFirstCompleted && (
-                          <div className="flex items-center justify-between mt-4 px-2">
-                            <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
-                              Concluídas ({orderedReminders.length - firstCompletedIndex})
-                            </h2>
-                            {completedTodayCount > 0 && (
-                              <span className="text-[13px] font-semibold px-3 py-1 rounded-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)">
-                                {completedTodayCount} hoje 🎉
-                              </span>
-                            )}
-                          </div>
-                        )}
+                      return (
+                        <SortableTaskItem key={reminder.id} id={reminder.id}>
+                          {isFirstCompleted && (
+                            <div className="flex items-center justify-between mt-4 px-2">
+                              <h2 className="text-[13px] uppercase font-semibold text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-1)">
+                                Concluídas ({orderedReminders.length - firstCompletedIndex})
+                              </h2>
+                              {completedTodayCount > 0 && (
+                                <span className="text-[13px] font-semibold px-3 py-1 rounded-full bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)">
+                                  {completedTodayCount} hoje 🎉
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                        <SwipeableTaskCell
-                          onCreateSubtask={canEditInThisView ? () => startCreatingAfter(reminder.id, true) : undefined}
-                          onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
-                          confirmBeforeDelete={preferences.confirmBeforeDelete}
-                          completed={reminder.completed}
-                        >
-                          <TaskCell
-                            id={reminder.id}
+                          <SwipeableTaskCell
+                            onCreateSubtask={canEditInThisView ? () => startCreatingAfter(reminder.id, true) : undefined}
+                            onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
+                            confirmBeforeDelete={preferences.confirmBeforeDelete}
                             completed={reminder.completed}
-                            title={reminder.title}
-                            notes={reminder.notes}
-                            dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
-                            priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                            flagged={reminder.flagged}
-                            tags={reminder.tags?.map((t) => t.tag)}
-                            subtaskCount={reminder._count.children}
-                            color={list.color}
-                            onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
-                            canEdit={canEditInThisView}
-                            isEditing={editingTitleId === reminder.id}
-                            editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
-                            onEditChange={setEditingTitleValue}
-                            onEditCancel={cancelInlineEdit}
-                            onEditSubmit={() => saveInlineTitle(reminder.id)}
-                            onClick={(id, _e, caretPos) => beginInlineEdit(reminder, caretPos ?? null)}
-                            initialCaretPos={editingTitleId === reminder.id ? editingCaretPos : null}
-                            onEnterPress={(id) => startCreatingAfter(id)}
-                            onInfoClick={() => {
-                              if (!canEditInThisView) return;
-                              setEditingReminder(reminder);
-                              setShowReminderModal(true);
-                            }}
                           >
-                            {/* Recursive Subtasks Rendering */}
-                            {(reminder.children && reminder.children.length > 0) && (
-                              <div className="pl-6 ml-4 border-l border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
-                                {reminder.children.map((sub) => (
-                                  <div key={sub.id} className="border-t border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
-                                    <TaskCell
-                                      id={sub.id}
-                                      completed={sub.completed}
-                                      title={sub.title}
-                                      notes={sub.notes}
-                                      dueDate={sub.utcDatetime ? new Date(sub.utcDatetime) : undefined}
-                                      priority={priorityMap[sub.priority as 0 | 1 | 2 | 3]}
-                                      flagged={sub.flagged}
-                                      tags={sub.tags?.map((t) => t.tag)}
-                                      color={list.color}
-                                      subtaskCount={sub._count.children}
-                                      onToggle={() => toggleWithUndo(sub, !sub.completed)}
-                                      canEdit={canEditInThisView}
-                                      isEditing={editingTitleId === sub.id}
-                                      editValue={editingTitleId === sub.id ? editingTitleValue : undefined}
-                                      onEditChange={setEditingTitleValue}
-                                      onEditCancel={cancelInlineEdit}
-                                      onEditSubmit={() => saveInlineTitle(sub.id)}
-                                      onClick={(id, _e, caretPos) => beginInlineEdit(sub, caretPos ?? null)}
-                                      initialCaretPos={editingTitleId === sub.id ? editingCaretPos : null}
-                                      onEnterPress={(id) => startCreatingAfter(id)} // Or maybe creating a subtask of a subtask?
-                                      onInfoClick={() => {
-                                        if (!canEditInThisView) return;
-                                        setEditingReminder(sub);
-                                        setShowReminderModal(true);
-                                      }}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </TaskCell>
-                        </SwipeableTaskCell>
-
-                        {creatingNewId === reminder.id && (
-                          <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
-                            <div className="flex-shrink-0 w-6 h-6" />
-                            <input
-                              ref={newItemInputRef}
-                              value={newItemTitle}
-                              onChange={(e) => setNewItemTitle(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  createNewItemInline();
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  cancelNewItem();
-                                }
+                            <TaskCell
+                              id={reminder.id}
+                              completed={reminder.completed}
+                              title={reminder.title}
+                              notes={reminder.notes}
+                              dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
+                              priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
+                              flagged={reminder.flagged}
+                              tags={reminder.tags?.map((t) => t.tag)}
+                              subtaskCount={reminder._count.children}
+                              color={list.color}
+                              collapsed={collapsedIds.has(reminder.id)}
+                              onToggleCollapse={() => toggleCollapse(reminder.id)}
+                              onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
+                              canEdit={canEditInThisView}
+                              isEditing={editingTitleId === reminder.id}
+                              editValue={editingTitleId === reminder.id ? editingTitleValue : undefined}
+                              onEditChange={setEditingTitleValue}
+                              onEditCancel={cancelInlineEdit}
+                              onEditSubmit={() => saveInlineTitle(reminder.id)}
+                              onClick={(id, _e, caretPos) => beginInlineEdit(reminder, caretPos ?? null)}
+                              initialCaretPos={editingTitleId === reminder.id ? editingCaretPos : null}
+                              onEnterPress={(id) => startCreatingAfter(id)}
+                              onInfoClick={() => {
+                                if (!canEditInThisView) return;
+                                setEditingReminder(reminder);
+                                setShowReminderModal(true);
                               }}
-                              onBlur={() => createNewItemInline()}
-                              placeholder="Novo lembrete"
-                              className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
-                              aria-label="Novo lembrete"
-                            />
-                          </div>
-                        )}
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
+                            >
+                              {/* Recursive Subtasks Rendering */}
+                              {(reminder.children && reminder.children.length > 0) && (
+                                <div className="pl-6 ml-4 border-l border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
+                                  {reminder.children.map((sub) => (
+                                    <div key={sub.id} className="border-t border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
+                                      <TaskCell
+                                        id={sub.id}
+                                        completed={sub.completed}
+                                        title={sub.title}
+                                        notes={sub.notes}
+                                        dueDate={sub.utcDatetime ? new Date(sub.utcDatetime) : undefined}
+                                        priority={priorityMap[sub.priority as 0 | 1 | 2 | 3]}
+                                        flagged={sub.flagged}
+                                        tags={sub.tags?.map((t) => t.tag)}
+                                        color={list.color}
+                                        subtaskCount={sub._count.children}
+                                        onToggle={() => toggleWithUndo(sub, !sub.completed)}
+                                        canEdit={canEditInThisView}
+                                        isEditing={editingTitleId === sub.id}
+                                        editValue={editingTitleId === sub.id ? editingTitleValue : undefined}
+                                        onEditChange={setEditingTitleValue}
+                                        onEditCancel={cancelInlineEdit}
+                                        onEditSubmit={() => saveInlineTitle(sub.id)}
+                                        onClick={(id, _e, caretPos) => beginInlineEdit(sub, caretPos ?? null)}
+                                        initialCaretPos={editingTitleId === sub.id ? editingCaretPos : null}
+                                        onEnterPress={(id) => startCreatingAfter(id)} 
+                                        onInfoClick={() => {
+                                          if (!canEditInThisView) return;
+                                          setEditingReminder(sub);
+                                          setShowReminderModal(true);
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TaskCell>
+                          </SwipeableTaskCell>
 
-                {creatingNewId === 'bottom' && orderedReminders.length > 0 && (
-                  <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
-                    <div className="flex-shrink-0 w-6 h-6" />
-                    <input
-                      ref={newItemInputRef}
-                      value={newItemTitle}
-                      onChange={(e) => setNewItemTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          createNewItemInline();
-                        }
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          cancelNewItem();
-                        }
-                      }}
-                      onBlur={() => createNewItemInline()}
-                      placeholder="Novo lembrete"
-                      className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
-                      aria-label="Novo lembrete"
-                    />
-                  </div>
-                )}
-              </div>
+                          {creatingNewId === reminder.id && (
+                            <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
+                              <div className="flex-shrink-0 w-6 h-6" />
+                              <input
+                                ref={newItemInputRef}
+                                value={newItemTitle}
+                                onChange={(e) => setNewItemTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    createNewItemInline();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelNewItem();
+                                  }
+                                }}
+                                onBlur={() => createNewItemInline()}
+                                placeholder="Novo lembrete"
+                                className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
+                                aria-label="Novo lembrete"
+                              />
+                            </div>
+                          )}
+                        </SortableTaskItem>
+                      );
+                    })}
+                  </SortableContext>
+
+                  {creatingNewId === 'bottom' && orderedReminders.length > 0 && (
+                    <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
+                       {/* Input logic preserved */}
+                      <div className="flex-shrink-0 w-6 h-6" />
+                      <input
+                        ref={newItemInputRef}
+                        value={newItemTitle}
+                        onChange={(e) => setNewItemTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            createNewItemInline();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelNewItem();
+                          }
+                        }}
+                        onBlur={() => createNewItemInline()}
+                        placeholder="Novo lembrete"
+                        className="flex-1 bg-transparent text-[17px] leading-[22px] text-black dark:text-white outline-none border-none placeholder:text-(--color-ios-gray-1) dark:placeholder:text-(--color-ios-dark-gray-1)"
+                        aria-label="Novo lembrete"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
+                  {activeDragId ? (
+                    (() => {
+                      const r = reminders.find(i => i.id === activeDragId);
+                      if (!r) return null;
+                      return (
+                        <div className="bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-5) rounded-xl shadow-lg border border-transparent overflow-hidden p-0 w-full max-w-sm cursor-grabbing">
+                           <div className="bg-white dark:bg-black p-3 opacity-90 flex items-center gap-3">
+                               <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 box-border" />
+                               <span className="font-medium text-[17px]">{r.title}</span>
+                           </div>
+                        </div>
+                      )
+                    })()
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             )}
           </>
         )}

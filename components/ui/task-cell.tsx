@@ -4,7 +4,7 @@ import React, { ReactNode, useEffect, useRef } from "react";
 import { CheckboxIOS } from "./checkbox-ios";
 import { DateBadge } from "./date-badge";
 import { PriorityBadge } from "./priority-badge";
-import { IoInformationCircleOutline, IoFlag } from "react-icons/io5";
+import { IoInformationCircleOutline, IoFlag, IoChevronDown, IoChevronForward } from "react-icons/io5";
 import { colors } from "@/lib/design-tokens";
 
 interface TaskCellProps {
@@ -33,6 +33,8 @@ interface TaskCellProps {
   initialCaretPos?: number | null;
   className?: string;
   children?: ReactNode;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export function TaskCell({
@@ -59,6 +61,8 @@ export function TaskCell({
   initialCaretPos = null,
   className = "",
   children,
+  collapsed = false,
+  onToggleCollapse,
 }: TaskCellProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -139,18 +143,6 @@ export function TaskCell({
         <div className="flex items-center gap-2 mb-1">
           <input
             ref={inputRef}
-            value={isEditing ? (editValue ?? title) : title}
-            readOnly={!isEditing}
-            inputMode="text"
-            onChange={(e) => onEditChange?.(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onMouseUp={(e) => {
-              e.stopPropagation();
-              if (!isEditing && canEdit) {
-                if (inputRef.current) {
-                  inputRef.current.readOnly = false;
-                  inputRef.current.focus();
-                }
                 const pos = inputRef.current?.selectionStart ?? undefined;
                 onClick?.(id, e as React.MouseEvent, pos);
               }
@@ -230,10 +222,31 @@ export function TaskCell({
           )}
         </div>
 
-        {children && <div className="mt-2">{children}</div>}
+        {children && !collapsed && <div className="mt-2">{children}</div>}
       </div>
 
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 flex items-center gap-1">
+        {subtaskCount !== undefined && subtaskCount > 0 && onToggleCollapse && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCollapse();
+            }}
+            className={
+              `p-1 rounded-full transition-opacity ` +
+              `opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 ` +
+              `hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-5) `
+            }
+            aria-label={collapsed ? "Expandir" : "Colapsar"}
+          >
+            {collapsed ? (
+              <IoChevronForward size={22} className="text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)" />
+            ) : (
+              <IoChevronDown size={22} className="text-(--color-ios-blue) dark:text-(--color-ios-dark-blue)" />
+            )}
+          </button>
+        )}
         <button
           type="button"
           onClick={(e) => {
