@@ -88,7 +88,7 @@ export function SwipeableTaskCell({
 
             {/* Right Action (Swipe Left) */}
             <div className="absolute inset-y-0 right-0 w-1/2 bg-(--color-ios-red) flex items-center justify-end px-6">
-                 <div className="flex flex-col items-center gap-1 text-white">
+                <div className="flex flex-col items-center gap-1 text-white">
                     <IoTrash size={24} />
                     {actionArmed === "delete" && <span className="text-[12px] font-bold">Apagar</span>}
                 </div>
@@ -101,7 +101,7 @@ export function SwipeableTaskCell({
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
                 animate={controls}
-                className="relative z-10 bg-white dark:bg-black" 
+                className="relative z-10 bg-white dark:bg-black"
                 style={{ touchAction: "pan-y" }}
             >
                 {children}

@@ -98,9 +98,9 @@ function buildReminderTree(flatReminders: Reminder[]): Reminder[] {
   const map = new Map<string, Reminder>();
   // Clone objects to avoid mutation issues if React Query freezes data
   flatReminders.forEach((r) => map.set(r.id, { ...r, children: [] }));
-  
+
   const roots: Reminder[] = [];
-  
+
   // Preserve order from the flat list (which is already sorted by query)
   flatReminders.forEach((r) => {
     const reminder = map.get(r.id)!;
@@ -818,12 +818,12 @@ export default function ListDetailPage({
                               setShowReminderModal(true);
                             }}
                           >
-                           {/* Recursive Subtasks Rendering */}
-                           {(reminder.children && reminder.children.length > 0) && (
+                            {/* Recursive Subtasks Rendering */}
+                            {(reminder.children && reminder.children.length > 0) && (
                               <div className="pl-6 ml-4 border-l border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
                                 {reminder.children.map((sub) => (
-                                   <div key={sub.id} className="border-t border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
-                                      <TaskCell
+                                  <div key={sub.id} className="border-t border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
+                                    <TaskCell
                                       id={sub.id}
                                       completed={sub.completed}
                                       title={sub.title}
@@ -850,10 +850,10 @@ export default function ListDetailPage({
                                         setShowReminderModal(true);
                                       }}
                                     />
-                                   </div>
+                                  </div>
                                 ))}
                               </div>
-                           )}
+                            )}
                           </TaskCell>
                         </SwipeableTaskCell>
 
