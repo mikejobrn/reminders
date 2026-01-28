@@ -36,6 +36,7 @@ export interface ReminderData {
   timezone?: string;
   listId: string;
   tagIds?: string[];
+  parentId?: string;
 }
 
 interface TagOption {
