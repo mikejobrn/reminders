@@ -65,7 +65,7 @@ export function TaskCell({
     if (!isEditing) return;
     const el = inputRef.current;
     if (!el) return;
-    
+
     const timeout = setTimeout(() => {
       el.focus();
       el.click();
