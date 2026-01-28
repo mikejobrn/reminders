@@ -143,11 +143,11 @@ export function TaskCell({
         <div className="flex items-center gap-2 mb-1">
           <input
             ref={inputRef}
-            const pos= inputRef.current?.selectionStart ?? undefined;
-          onClick?.(id, e as React.MouseEvent, pos);
-              }
-            }}
-          disabled={!canEdit}
+            value={isEditing ? (editValue ?? title) : title}
+            readOnly={!isEditing}
+            inputMode="text"
+            onChange={(e) => onEditChange?.(e.target.value)}
+            disabled={!canEdit}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
