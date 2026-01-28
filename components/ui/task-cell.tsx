@@ -148,33 +148,33 @@ export function TaskCell({
             inputMode="text"
             onChange={(e) => onEditChange?.(e.target.value)}
             disabled={!canEdit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              if (isEditing) {
-                onEditSubmit?.();
-              } else if (onEnterPress) {
-                onEnterPress(id);
-              } else {
-                onClick?.(id);
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (isEditing) {
+                  onEditSubmit?.();
+                } else if (onEnterPress) {
+                  onEnterPress(id);
+                } else {
+                  onClick?.(id);
+                }
               }
-            }
-            if (e.key === "Escape") {
-              e.preventDefault();
-              if (isEditing) {
-                onEditCancel?.();
+              if (e.key === "Escape") {
+                e.preventDefault();
+                if (isEditing) {
+                  onEditCancel?.();
+                }
               }
+            }}
+            onBlur={() => isEditing && onEditSubmit?.()}
+            className={
+              `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1box-shadow-none ` +
+              (completed
+                ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
+                : "text-black dark:text-white") +
+              (!isEditing ? " cursor-pointer" : "")
             }
-          }}
-          onBlur={() => isEditing && onEditSubmit?.()}
-          className={
-            `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1box-shadow-none ` +
-            (completed
-              ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-              : "text-black dark:text-white") +
-            (!isEditing ? " cursor-pointer" : "")
-          }
-          aria-label="Título da tarefa"
+            aria-label="Título da tarefa"
           />
           {flagged && (
             <IoFlag
