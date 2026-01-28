@@ -519,7 +519,7 @@ export default function ListDetailPage({
     if (pendingUndo && toastItem) {
       handleUndoTimeout(toastItem.id);
     }
-    
+
     setPendingUndo(payload);
     setToastItem({
       id: payload.id,

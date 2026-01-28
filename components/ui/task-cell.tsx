@@ -173,9 +173,9 @@ export function TaskCell({
             aria-label="Título da tarefa"
           />
           {flagged && (
-            <IoFlag 
-              size={14} 
-              className="text-(--color-ios-orange) dark:text-(--color-ios-dark-orange) flex-shrink-0" 
+            <IoFlag
+              size={14}
+              className="text-(--color-ios-orange) dark:text-(--color-ios-dark-orange) flex-shrink-0"
             />
           )}
           {priority !== "none" && <PriorityBadge priority={priority} />}
