@@ -5,6 +5,7 @@ import { CheckboxIOS } from "./checkbox-ios";
 import { DateBadge } from "./date-badge";
 import { PriorityBadge } from "./priority-badge";
 import { IoInformationCircleOutline, IoFlag } from "react-icons/io5";
+import { colors } from "@/lib/design-tokens";
 
 interface TaskCellProps {
   id: string;
@@ -61,24 +62,12 @@ export function TaskCell({
 }: TaskCellProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Focus management for iOS
   useEffect(() => {
-    if (!isEditing) return;
-    const el = inputRef.current;
-    if (!el) return;
-
-    el.focus();
-    // Ensure we don't lose the selection logic if needed, but usually simple focus is enough
-    // for the keyboard to appear.
-    // We can keep the selection logic sync
-    const val = el.value ?? "";
-    if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
-      const pos = Math.min(initialCaretPos, val.length);
-      el.setSelectionRange(pos, pos);
-    } else {
-      const len = val.length;
-      el.setSelectionRange(len, len);
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
     }
-  }, [isEditing, initialCaretPos]);
+  }, [isEditing]);
 
   const handleCheckboxChange = (checked: boolean) => {
     if (!canEdit) return;
@@ -87,10 +76,24 @@ export function TaskCell({
 
   const handleCellClick = (e: React.MouseEvent) => {
     if (!canEdit) return;
-    // ignore clicks in action buttons; input will stop propagation itself
+    // ignore clicks in action buttons
     const target = e.target as HTMLElement;
-    if (target.closest("button")) return;
+    if (target.closest("button") || target.closest("a")) return;
+
+    // IOS KEYBOARD HACK:
+    // We must focus the input synchronously during the user event.
+    // And we must ensure it is not read-only at this moment.
+    if (inputRef.current) {
+      inputRef.current.readOnly = false;
+      inputRef.current.focus();
+    }
+    
     onClick?.(id, e, undefined);
+  };
+
+  const resolveTagColor = (colorName: string) => {
+    // @ts-ignore
+    return (colors.light && colors.light[colorName]) || colorName || "#007AFF";
   };
 
   const handleContainerKeyDown = (e: React.KeyboardEvent) => {
@@ -144,6 +147,10 @@ export function TaskCell({
             onMouseUp={(e) => {
               e.stopPropagation();
               if (!isEditing && canEdit) {
+                if (inputRef.current) {
+                   inputRef.current.readOnly = false;
+                   inputRef.current.focus();
+                }
                 const pos = inputRef.current?.selectionStart ?? undefined;
                 onClick?.(id, e as React.MouseEvent, pos);
               }
@@ -167,12 +174,13 @@ export function TaskCell({
                 }
               }
             }}
-            onBlur={() => onEditSubmit?.()}
+            onBlur={() => isEditing && onEditSubmit?.()}
             className={
-              `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1 ` +
+              `w-full bg-transparent text-[17px] leading-[22px] outline-none border-none disabled:opacity-60 flex-1box-shadow-none ` +
               (completed
                 ? "line-through text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)"
-                : "te8t-black dark:text-white")
+                : "text-black dark:text-white") +
+              (!isEditing ? " cursor-pointer" : "")
             }
             aria-label="Título da tarefa"
           />
@@ -207,7 +215,7 @@ export function TaskCell({
                 <span
                   key={tag.id}
                   className="text-[12px] font-medium"
-                  style={{ color: tag.color || "#007AFF" }}
+                  style={{ color: resolveTagColor(tag.color) }}
                 >
                   #{tag.name}
                 </span>

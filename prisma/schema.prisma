@@ -136,6 +136,7 @@ model Reminder {
   completed               Boolean             @default(false)
   completedAt             DateTime?           @map("completed_at")
   priority                Priority            @default(NONE)
+  flagged                 Boolean             @default(false)
   utcDatetime             DateTime?           @map("utc_datetime") @db.Timestamptz(6)
   timezone                String?
   isFloating              Boolean             @default(false) @map("is_floating")

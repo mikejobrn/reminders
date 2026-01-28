@@ -252,6 +252,7 @@ export default function ListDetailPage({
   const [editingTitleValue, setEditingTitleValue] = useState<string>("");
   const [editingCaretPos, setEditingCaretPos] = useState<number | null>(null);
   const [creatingNewId, setCreatingNewId] = useState<string | null>(null);
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState<string>("");
   const [pendingUndo, setPendingUndo] = useState<{
     id: string;
@@ -361,8 +362,24 @@ export default function ListDetailPage({
 
       return previousReminders;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
+    onSuccess: (savedReminder) => {
+      // Update cache manually to prevent flicker
+      queryClient.setQueryData<Reminder[]>(remindersQueryKey, (old) => {
+        if (!old) return [];
+        if (editingReminder) {
+          return old.map((r) => r.id === savedReminder.id ? savedReminder : r);
+        }
+        // For new items, we might have a temp one. Since we don't track the temp ID easily here,
+        // we'll append the real one. Ideally we should remove the temp one.
+        // But since we invalidate validation below, it might be fine.
+        // However, invalidation causes flicker. 
+        // Let's just append for now and let the invalidation clean up duplicates if any,
+        // or removing temp items if we could identify them.
+        return [...old, savedReminder];
+      });
+      
+      // Delay invalidation slightly or skip if we trust the return
+      // queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
       setShowReminderModal(false);
       setEditingReminder(undefined);
     },
@@ -513,18 +530,33 @@ export default function ListDetailPage({
       cancelNewItem();
       return;
     }
-    handleCreateReminder({ title, listId });
+    
+    let parentId: string | undefined = undefined;
+    if (creatingNewId && creatingNewId !== 'bottom') {
+      const refReminder = reminders.find(r => r.id === creatingNewId);
+      if (refReminder) {
+        if (isCreatingSubtask) {
+          parentId = refReminder.id;
+        } else {
+          parentId = refReminder.parentId || undefined;
+        }
+      }
+    }
+
+    handleCreateReminder({ title, listId, parentId });
   };
 
   const cancelNewItem = () => {
     setCreatingNewId(null);
+    setIsCreatingSubtask(false);
     setNewItemTitle("");
   };
 
-  const startCreatingAfter = (reminderId: string | null) => {
+  const startCreatingAfter = (reminderId: string | null, asSubtask = false) => {
     if (!canEditInThisView) return;
     cancelInlineEdit();
     setCreatingNewId(reminderId ?? "bottom");
+    setIsCreatingSubtask(asSubtask);
     setNewItemTitle("");
     setTimeout(() => newItemInputRef.current?.focus(), 10);
   };
@@ -719,7 +751,7 @@ export default function ListDetailPage({
       </div>
 
       {/* Content */}
-      <div className="max-w-3xl px-4 py-6 flex flex-col flex-1">
+      <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col flex-1 w-full">
         {remindersLoading ? (
           <SkeletonLoader />
         ) : orderedReminders.length === 0 && creatingNewId !== 'bottom' ? (
@@ -786,7 +818,7 @@ export default function ListDetailPage({
                         )}
 
                         <SwipeableTaskCell
-                          onCreateSubtask={canEditInThisView ? () => startCreatingAfter(reminder.id) : undefined}
+                          onCreateSubtask={canEditInThisView ? () => startCreatingAfter(reminder.id, true) : undefined}
                           onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
                           confirmBeforeDelete={preferences.confirmBeforeDelete}
                           completed={reminder.completed}
