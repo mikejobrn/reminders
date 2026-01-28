@@ -66,20 +66,18 @@ export function TaskCell({
     const el = inputRef.current;
     if (!el) return;
 
-    const timeout = setTimeout(() => {
-      el.focus();
-      el.click();
-      const val = el.value ?? "";
-      if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
-        const pos = Math.min(initialCaretPos, val.length);
-        el.setSelectionRange(pos, pos);
-      } else {
-        const len = val.length;
-        el.setSelectionRange(len, len);
-      }
-    }, 50);
-
-    return () => clearTimeout(timeout);
+    el.focus();
+    // Ensure we don't lose the selection logic if needed, but usually simple focus is enough
+    // for the keyboard to appear.
+    // We can keep the selection logic sync
+    const val = el.value ?? "";
+    if (typeof initialCaretPos === "number" && initialCaretPos >= 0) {
+      const pos = Math.min(initialCaretPos, val.length);
+      el.setSelectionRange(pos, pos);
+    } else {
+      const len = val.length;
+      el.setSelectionRange(len, len);
+    }
   }, [isEditing, initialCaretPos]);
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -115,7 +113,7 @@ export function TaskCell({
   return (
     <div
       className={
-        `group flex items-start gap-3 p-4
+        `group flex items-start gap-3 p-3 pl-4
         bg-white dark:bg-black
         border-b border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)
         hover:bg-(--color-ios-gray-6) dark:hover:bg-(--color-ios-dark-gray-5)
@@ -204,14 +202,15 @@ export function TaskCell({
           {dueDate && <DateBadge date={dueDate} />}
 
           {tags && tags.length > 0 && (
-            <div className="flex gap-1.5 items-center">
+            <div className="flex flex-wrap gap-1">
               {tags.map((tag) => (
-                <div
+                <span
                   key={tag.id}
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: tag.color || "#8E8E93" }}
-                  title={tag.name}
-                />
+                  className="text-[12px] font-medium"
+                  style={{ color: tag.color || "#007AFF" }}
+                >
+                  #{tag.name}
+                </span>
               ))}
             </div>
           )}

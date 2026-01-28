@@ -85,11 +85,35 @@ interface Reminder {
       color: string;
     };
   }>;
+  parentId?: string | null;
+  children?: Reminder[];
   _count: {
     children: number;
     attachments: number;
   };
 }
+
+function buildReminderTree(flatReminders: Reminder[]): Reminder[] {
+  if (!flatReminders) return [];
+  const map = new Map<string, Reminder>();
+  // Clone objects to avoid mutation issues if React Query freezes data
+  flatReminders.forEach((r) => map.set(r.id, { ...r, children: [] }));
+  
+  const roots: Reminder[] = [];
+  
+  // Preserve order from the flat list (which is already sorted by query)
+  flatReminders.forEach((r) => {
+    const reminder = map.get(r.id)!;
+    if (r.parentId && map.has(r.parentId)) {
+      map.get(r.parentId)!.children!.push(reminder);
+    } else {
+      roots.push(reminder);
+    }
+  });
+
+  return roots;
+}
+
 
 interface List {
   id: string;
@@ -136,7 +160,7 @@ async function fetchReminders(listId: string, includeCompleted: boolean): Promis
     return response.json();
   }
 
-  const response = await fetch(`/api/lists/${listId}/reminders?parentId=null${includeCompleted ? "&includeCompleted=true" : ""}`);
+  const response = await fetch(`/api/lists/${listId}/reminders?${includeCompleted ? "includeCompleted=true" : ""}`);
   if (response.status === 401 || response.status === 403) {
     throw new Error("Unauthorized");
   }
@@ -274,6 +298,7 @@ export default function ListDetailPage({
   const { data: reminders = [], isLoading: remindersLoading, error: remindersError } = useQuery({
     queryKey: remindersQueryKey,
     queryFn: () => fetchReminders(listId, includeCompleted),
+    staleTime: 5000,
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message === "Unauthorized") {
         return false;
@@ -583,7 +608,10 @@ export default function ListDetailPage({
     return completedList;
   }, [reminders, preferences.completedVisibility]);
 
-  const visibleIncomplete = useMemo(() => reminders.filter((r) => !r.completed), [reminders]);
+  // Build tree from flat list
+  const rootReminders = useMemo(() => buildReminderTree(reminders || []), [reminders]);
+
+  const visibleIncomplete = useMemo(() => rootReminders.filter((r) => !r.completed), [rootReminders]);
 
   const orderedReminders = useMemo(() => {
     if (preferences.completedVisibility === "HIDE") {
@@ -595,11 +623,11 @@ export default function ListDetailPage({
         ...visibleIncomplete.map((r) => r.id),
         ...visibleCompleted.map((r) => r.id),
       ]);
-      return reminders.filter((r) => allowedIds.has(r.id));
+      return rootReminders.filter((r) => allowedIds.has(r.id));
     }
 
     return [...visibleIncomplete, ...visibleCompleted];
-  }, [preferences.completedPosition, preferences.completedVisibility, reminders, visibleCompleted, visibleIncomplete]);
+  }, [preferences.completedPosition, preferences.completedVisibility, rootReminders, visibleCompleted, visibleIncomplete]);
 
   const completedTodayCount = useMemo(
     () => reminders.filter((r) => r.completed && isTodayLocal(r.completedAt ?? undefined)).length,
@@ -729,7 +757,7 @@ export default function ListDetailPage({
         ) : (
           <>
             {orderedReminders.length > 0 && (
-              <div className="space-y-2 mb-6">
+              <div className="flex flex-col mb-6 bg-white dark:bg-(--color-ios-dark-gray-6) rounded-xl overflow-hidden shadow-sm">
                 <AnimatePresence initial={false}>
                   {orderedReminders.map((reminder, index) => {
                     const priorityMap = { 0: "none" as const, 1: "low" as const, 2: "medium" as const, 3: "high" as const };
@@ -771,8 +799,9 @@ export default function ListDetailPage({
                             dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
                             priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
                             flagged={reminder.flagged}
-                            tags={reminder.tags.map((t) => t.tag)}
+                            tags={reminder.tags?.map((t) => t.tag)}
                             subtaskCount={reminder._count.children}
+                            color={list.color}
                             onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
                             canEdit={canEditInThisView}
                             isEditing={editingTitleId === reminder.id}
@@ -788,7 +817,44 @@ export default function ListDetailPage({
                               setEditingReminder(reminder);
                               setShowReminderModal(true);
                             }}
-                          />
+                          >
+                           {/* Recursive Subtasks Rendering */}
+                           {(reminder.children && reminder.children.length > 0) && (
+                              <div className="pl-6 ml-4 border-l border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
+                                {reminder.children.map((sub) => (
+                                   <div key={sub.id} className="border-t border-(--color-ios-gray-5) dark:border-(--color-ios-dark-gray-5)">
+                                      <TaskCell
+                                      id={sub.id}
+                                      completed={sub.completed}
+                                      title={sub.title}
+                                      notes={sub.notes}
+                                      dueDate={sub.utcDatetime ? new Date(sub.utcDatetime) : undefined}
+                                      priority={priorityMap[sub.priority as 0 | 1 | 2 | 3]}
+                                      flagged={sub.flagged}
+                                      tags={sub.tags?.map((t) => t.tag)}
+                                      color={list.color}
+                                      subtaskCount={sub._count.children}
+                                      onToggle={() => toggleWithUndo(sub, !sub.completed)}
+                                      canEdit={canEditInThisView}
+                                      isEditing={editingTitleId === sub.id}
+                                      editValue={editingTitleId === sub.id ? editingTitleValue : undefined}
+                                      onEditChange={setEditingTitleValue}
+                                      onEditCancel={cancelInlineEdit}
+                                      onEditSubmit={() => saveInlineTitle(sub.id)}
+                                      onClick={(id, _e, caretPos) => beginInlineEdit(sub, caretPos ?? null)}
+                                      initialCaretPos={editingTitleId === sub.id ? editingCaretPos : null}
+                                      onEnterPress={(id) => startCreatingAfter(id)} // Or maybe creating a subtask of a subtask?
+                                      onInfoClick={() => {
+                                        if (!canEditInThisView) return;
+                                        setEditingReminder(sub);
+                                        setShowReminderModal(true);
+                                      }}
+                                    />
+                                   </div>
+                                ))}
+                              </div>
+                           )}
+                          </TaskCell>
                         </SwipeableTaskCell>
 
                         {creatingNewId === reminder.id && (
