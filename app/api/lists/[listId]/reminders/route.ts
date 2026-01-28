@@ -316,6 +316,35 @@ export async function POST(
       },
     });
 
+    // Schedule notification if reminder has datetime and OneSignal is configured
+    if (utcDatetime && process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) {
+      try {
+        const scheduleResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/schedule`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cookie': request.headers.get('cookie') || '',
+            },
+            body: JSON.stringify({
+              reminderId: newReminder.id,
+              title: newReminder.title,
+              body: newReminder.notes || undefined,
+              scheduledAt: utcDatetime.toISOString(),
+              listId: newReminder.listId,
+            }),
+          }
+        );
+
+        if (!scheduleResponse.ok) {
+          console.error('Failed to schedule notification');
+        }
+      } catch (error) {
+        console.error('Error scheduling notification:', error);
+      }
+    }
+
     return NextResponse.json(newReminder, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

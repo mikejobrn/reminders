@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { IoClose, IoCalendar, IoFlag, IoPricetag, IoChevronForward } from "react-icons/io5";
+import { requestNotificationPermission, getOneSignalPlayerId } from "@/lib/notifications";
 
 interface ReminderModalProps {
   isOpen: boolean;
@@ -114,6 +115,26 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
 
     setSaving(true);
     try {
+      // Request notification permission if setting datetime for the first time
+      if (dueDate && !reminder?.utcDatetime) {
+        const hasPermission = await requestNotificationPermission();
+        if (hasPermission) {
+          // Update user's OneSignal player ID
+          const playerId = await getOneSignalPlayerId();
+          if (playerId) {
+            try {
+              await fetch('/api/user/onesignal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerId }),
+              });
+            } catch (error) {
+              console.error('Error saving OneSignal player ID:', error);
+            }
+          }
+        }
+      }
+
       await onSave({
         title: title.trim(),
         notes: notes.trim() || undefined,

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion, useAnimationControls } from "framer-motion";
-import { IoCheckmark, IoTrash } from "react-icons/io5";
+import { IoCheckmark, IoTrash, IoArrowUndo } from "react-icons/io5";
 
 interface SwipeableTaskCellProps {
     children: React.ReactNode;
@@ -78,8 +78,8 @@ export function SwipeableTaskCell({
         <div className="relative">
             <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none select-none">
                 <div className="flex items-center text-(--color-ios-green) gap-2 opacity-80">
-                    <IoCheckmark size={20} />
-                    <span className="text-sm font-medium">Concluir</span>
+                    {completed ? <IoArrowUndo size={20} /> : <IoCheckmark size={20} />}
+                    <span className="text-sm font-medium">{completed ? "Reabrir" : "Concluir"}</span>
                 </div>
                 <div className="flex items-center text-(--color-ios-red) gap-2 opacity-80">
                     <span className="text-sm font-medium">Apagar</span>

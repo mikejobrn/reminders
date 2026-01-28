@@ -368,6 +368,55 @@ export async function PATCH(
       },
     });
 
+    // Handle notification scheduling/cancellation
+    if (process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) {
+      // Cancel existing notification if present
+      if (access.reminder?.oneSignalNotificationId) {
+        try {
+          await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/cancel`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cookie': request.headers.get('cookie') || '',
+              },
+              body: JSON.stringify({
+                oneSignalNotificationId: access.reminder.oneSignalNotificationId,
+              }),
+            }
+          );
+        } catch (error) {
+          console.error('Error cancelling notification:', error);
+        }
+      }
+
+      // Schedule new notification if reminder has datetime
+      if (updatedReminder.utcDatetime) {
+        try {
+          await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/schedule`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cookie': request.headers.get('cookie') || '',
+              },
+              body: JSON.stringify({
+                reminderId: updatedReminder.id,
+                title: updatedReminder.title,
+                body: updatedReminder.notes || undefined,
+                scheduledAt: updatedReminder.utcDatetime.toISOString(),
+                listId: updatedReminder.listId,
+              }),
+            }
+          );
+        } catch (error) {
+          console.error('Error scheduling notification:', error);
+        }
+      }
+    }
+
     return NextResponse.json(updatedReminder);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -413,6 +462,27 @@ export async function DELETE(
         deletedAt: new Date(),
       },
     });
+
+    // Cancel notification if present
+    if (access.reminder?.oneSignalNotificationId && process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID) {
+      try {
+        await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/cancel`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cookie': request.headers.get('cookie') || '',
+            },
+            body: JSON.stringify({
+              oneSignalNotificationId: access.reminder.oneSignalNotificationId,
+            }),
+          }
+        );
+      } catch (error) {
+        console.error('Error cancelling notification:', error);
+      }
+    }
 
     return NextResponse.json({ message: "Lembrete deletado com sucesso" });
   } catch (error) {

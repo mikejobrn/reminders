@@ -35,8 +35,34 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {oneSignalAppId && (
+          <>
+            <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.OneSignal = window.OneSignal || [];
+                  OneSignal.push(function() {
+                    OneSignal.init({
+                      appId: "${oneSignalAppId}",
+                      safari_web_id: "${oneSignalAppId}",
+                      notifyButton: {
+                        enable: false,
+                      },
+                      allowLocalhostAsSecureOrigin: true,
+                    });
+                  });
+                `,
+              }}
+            />
+          </>
+        )}
+      </head>
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"

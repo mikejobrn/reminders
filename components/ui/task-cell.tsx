@@ -4,7 +4,7 @@ import React, { ReactNode, useEffect, useRef } from "react";
 import { CheckboxIOS } from "./checkbox-ios";
 import { DateBadge } from "./date-badge";
 import { PriorityBadge } from "./priority-badge";
-import { IoInformationCircleOutline } from "react-icons/io5";
+import { IoInformationCircleOutline, IoFlag } from "react-icons/io5";
 
 interface TaskCellProps {
   id: string;
@@ -12,6 +12,7 @@ interface TaskCellProps {
   notes?: string;
   completed?: boolean;
   priority?: "none" | "low" | "medium" | "high";
+  flagged?: boolean;
   dueDate?: Date | string;
   color?: string;
   tags?: string[];
@@ -39,6 +40,7 @@ export function TaskCell({
   notes,
   completed = false,
   priority = "none",
+  flagged = false,
   dueDate,
   color = "var(--color-ios-blue)",
   tags,
@@ -132,6 +134,7 @@ export function TaskCell({
             ref={inputRef}
             value={isEditing ? (editValue ?? title) : title}
             readOnly={!isEditing}
+            inputMode="text"
             onChange={(e) => onEditChange?.(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             onMouseUp={(e) => {
@@ -169,6 +172,12 @@ export function TaskCell({
             }
             aria-label="Título da tarefa"
           />
+          {flagged && (
+            <IoFlag 
+              size={14} 
+              className="text-(--color-ios-orange) dark:text-(--color-ios-dark-orange) flex-shrink-0" 
+            />
+          )}
           {priority !== "none" && <PriorityBadge priority={priority} />}
         </div>
 
@@ -189,12 +198,27 @@ export function TaskCell({
           {dueDate && <DateBadge date={dueDate} />}
 
           {tags && tags.length > 0 && (
-            <div className="flex gap-1">
-              {tags.map((tag) => (
-                <span key={tag} className="text-[13px] text-(--color-ios-gray-1) dark:text-(--color-ios-dark-gray-2)">
-                  #{tag}
-                </span>
-              ))}
+            <div className="flex gap-1.5 items-center">
+              {tags.map((tag) => {
+                const colorMap: Record<string, string> = {
+                  blue: "#007AFF",
+                  red: "#FF3B30",
+                  orange: "#FF9500",
+                  yellow: "#FFCC00",
+                  green: "#34C759",
+                  teal: "#5AC8FA",
+                  purple: "#AF52DE",
+                  pink: "#FF2D55",
+                };
+                return (
+                  <div
+                    key={tag}
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: colorMap[tag] || "#8E8E93" }}
+                    title={tag}
+                  />
+                );
+              })}
             </div>
           )}
 

@@ -515,6 +515,11 @@ export default function ListDetailPage({
     reminderId: string;
     previousCompleted?: boolean;
   }) => {
+    // Dismiss existing toast and commit pending undo action
+    if (pendingUndo && toastItem) {
+      handleUndoTimeout(toastItem.id);
+    }
+    
     setPendingUndo(payload);
     setToastItem({
       id: payload.id,
@@ -753,7 +758,7 @@ export default function ListDetailPage({
                         )}
 
                         <SwipeableTaskCell
-                          onComplete={canEditInThisView ? () => toggleWithUndo(reminder, true) : undefined}
+                          onComplete={canEditInThisView ? () => toggleWithUndo(reminder, !reminder.completed) : undefined}
                           onDelete={canEditInThisView ? () => deleteWithUndo(reminder) : undefined}
                           confirmBeforeDelete={preferences.confirmBeforeDelete}
                           completed={reminder.completed}
@@ -765,7 +770,8 @@ export default function ListDetailPage({
                             notes={reminder.notes}
                             dueDate={reminder.utcDatetime ? new Date(reminder.utcDatetime) : undefined}
                             priority={priorityMap[reminder.priority as 0 | 1 | 2 | 3]}
-                            tags={reminder.tags.map((t) => t.tag.name)}
+                            flagged={reminder.flagged}
+                            tags={reminder.tags.map((t) => t.tag.color)}
                             subtaskCount={reminder._count.children}
                             onToggle={() => toggleWithUndo(reminder, !reminder.completed)}
                             canEdit={canEditInThisView}
