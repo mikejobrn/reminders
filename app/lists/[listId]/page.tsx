@@ -377,7 +377,7 @@ export default function ListDetailPage({
         // or removing temp items if we could identify them.
         return [...old, savedReminder];
       });
-      
+
       // Delay invalidation slightly or skip if we trust the return
       // queryClient.invalidateQueries({ queryKey: ["reminders", listId] });
       setShowReminderModal(false);
@@ -530,7 +530,7 @@ export default function ListDetailPage({
       cancelNewItem();
       return;
     }
-    
+
     let parentId: string | undefined = undefined;
     if (creatingNewId && creatingNewId !== 'bottom') {
       const refReminder = reminders.find(r => r.id === creatingNewId);

@@ -87,7 +87,7 @@ export function TaskCell({
       inputRef.current.readOnly = false;
       inputRef.current.focus();
     }
-    
+
     onClick?.(id, e, undefined);
   };
 
@@ -148,8 +148,8 @@ export function TaskCell({
               e.stopPropagation();
               if (!isEditing && canEdit) {
                 if (inputRef.current) {
-                   inputRef.current.readOnly = false;
-                   inputRef.current.focus();
+                  inputRef.current.readOnly = false;
+                  inputRef.current.focus();
                 }
                 const pos = inputRef.current?.selectionStart ?? undefined;
                 onClick?.(id, e as React.MouseEvent, pos);
