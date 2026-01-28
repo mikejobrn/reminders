@@ -353,9 +353,9 @@ export default function ListDetailPage({
     setActiveDragId(null);
 
     if (active.id !== over?.id) {
-       // Ideally implement reordering logic here
-       // For now just console log as backend reordering requires more setup
-       console.log("Reordered", active.id, over?.id);
+      // Ideally implement reordering logic here
+      // For now just console log as backend reordering requires more setup
+      console.log("Reordered", active.id, over?.id);
     }
   };
 
@@ -974,7 +974,7 @@ export default function ListDetailPage({
                                         onEditSubmit={() => saveInlineTitle(sub.id)}
                                         onClick={(id, _e, caretPos) => beginInlineEdit(sub, caretPos ?? null)}
                                         initialCaretPos={editingTitleId === sub.id ? editingCaretPos : null}
-                                        onEnterPress={(id) => startCreatingAfter(id)} 
+                                        onEnterPress={(id) => startCreatingAfter(id)}
                                         onInfoClick={() => {
                                           if (!canEditInThisView) return;
                                           setEditingReminder(sub);
@@ -1019,7 +1019,7 @@ export default function ListDetailPage({
 
                   {creatingNewId === 'bottom' && orderedReminders.length > 0 && (
                     <div className="flex items-center gap-3 p-4 bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-6) rounded-xl mt-2">
-                       {/* Input logic preserved */}
+                      {/* Input logic preserved */}
                       <div className="flex-shrink-0 w-6 h-6" />
                       <input
                         ref={newItemInputRef}
@@ -1051,10 +1051,10 @@ export default function ListDetailPage({
                       if (!r) return null;
                       return (
                         <div className="bg-(--color-ios-gray-6) dark:bg-(--color-ios-dark-gray-5) rounded-xl shadow-lg border border-transparent overflow-hidden p-0 w-full max-w-sm cursor-grabbing">
-                           <div className="bg-white dark:bg-black p-3 opacity-90 flex items-center gap-3">
-                               <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 box-border" />
-                               <span className="font-medium text-[17px]">{r.title}</span>
-                           </div>
+                          <div className="bg-white dark:bg-black p-3 opacity-90 flex items-center gap-3">
+                            <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 box-border" />
+                            <span className="font-medium text-[17px]">{r.title}</span>
+                          </div>
                         </div>
                       )
                     })()
